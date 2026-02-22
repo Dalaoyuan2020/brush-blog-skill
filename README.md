@@ -8,7 +8,7 @@
 - **skill 入口**: `SKILL.md`（`name: brush`，支持 `/brush`）
 - **数据源**: RSS（可扩展到 Twitter、YouTube）
 - **推荐算法**: 规则+权重，先简单后优化
-- **状态**: 🟡 M8 测试发布进行中
+- **状态**: ✅ M8 完成（全里程碑通过）
 
 ## Agent Team 协作项目
 
