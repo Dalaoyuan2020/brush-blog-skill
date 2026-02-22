@@ -10,8 +10,8 @@ from typing import Any, Dict, List, Optional
 
 from fetcher.rss import (
     collect_latest_articles,
+    list_articles_from_pool,
     load_feeds,
-    pick_article_from_pool,
     refresh_content_pool,
 )
 from interaction.telegram import (
@@ -20,6 +20,7 @@ from interaction.telegram import (
     build_deep_read_message,
     build_saved_message,
 )
+from recommend.scorer import rank_items
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FEEDS_FILE = ROOT_DIR / "data" / "feeds.json"
@@ -27,6 +28,7 @@ CONTENT_DB = ROOT_DIR / "data" / "content.db"
 PROFILES_DIR = ROOT_DIR / "data" / "profiles"
 READ_HISTORY_LIMIT = 100
 SAVED_ITEMS_LIMIT = 200
+SOURCE_HISTORY_LIMIT = 50
 
 
 def _build_mock_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
@@ -43,14 +45,15 @@ def _build_mock_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
     }
 
 
-def _build_recommended_item(
-    feeds: Dict[str, List[Dict[str, Any]]], history_item_keys: Optional[List[str]] = None
-) -> Dict[str, Any]:
+def _build_recommended_item(feeds: Dict[str, List[Dict[str, Any]]], profile: Dict[str, Any]) -> Dict[str, Any]:
     """
     Build one recommended card item from content pool with live fallback.
     """
     card_item = _build_mock_item(feeds)
-    exclude_keys = history_item_keys or []
+    history_item_keys = profile.get("read_history", [])
+    if not isinstance(history_item_keys, list):
+        history_item_keys = []
+    exclude_keys = history_item_keys
 
     try:
         refresh_content_pool(
@@ -65,11 +68,29 @@ def _build_recommended_item(
         pass
 
     try:
-        pooled_article = pick_article_from_pool(
+        candidates = list_articles_from_pool(
             CONTENT_DB,
             priority_category="priority_hn_popular_2025",
             exclude_item_keys=exclude_keys,
+            limit=50,
         )
+        if candidates:
+            ranked = rank_items(
+                candidates,
+                profile=profile,
+                recent_sources=profile.get("source_history", [])
+                if isinstance(profile.get("source_history", []), list)
+                else [],
+                weights={
+                    "interest": 0.4,
+                    "knowledge": 0.3,
+                    "diversity": 0.2,
+                    "popularity": 0.1,
+                },
+            )
+            pooled_article = ranked[0]
+        else:
+            pooled_article = None
     except Exception:
         pooled_article = None
 
@@ -135,6 +156,7 @@ def _default_profile() -> Dict[str, Any]:
     return {
         "interest_tags": {},
         "read_history": [],
+        "source_history": [],
         "saved_items": [],
         "last_item": {},
     }
@@ -177,6 +199,18 @@ def _record_saved_item(profile: Dict[str, Any], item: Dict[str, Any]) -> Dict[st
     return profile
 
 
+def _record_source_history(profile: Dict[str, Any], source: str) -> Dict[str, Any]:
+    history = profile.get("source_history", [])
+    if not isinstance(history, list):
+        history = []
+
+    if source:
+        history.append(source)
+        history = history[-SOURCE_HISTORY_LIMIT:]
+    profile["source_history"] = history
+    return profile
+
+
 def _update_interest_tags(profile: Dict[str, Any], tags: List[str], delta: int) -> Dict[str, Any]:
     interest = profile.get("interest_tags", {})
     if not isinstance(interest, dict):
@@ -207,13 +241,10 @@ def _build_brush_response(item: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _next_item_response(user_id: str, profile: Dict[str, Any], feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
-    history = profile.get("read_history", [])
-    if not isinstance(history, list):
-        history = []
-
-    card_item = _build_recommended_item(feeds, history_item_keys=history)
+    card_item = _build_recommended_item(feeds, profile=profile)
     profile["last_item"] = card_item
     profile = _record_read_history(profile, card_item.get("item_key", ""))
+    profile = _record_source_history(profile, card_item.get("source", ""))
     _save_profile(user_id, profile)
 
     return _build_brush_response(card_item)
@@ -302,13 +333,15 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
 # CLI 入口（本地测试用）
 def run_brush() -> int:
     """Handle /brush command with priority RSS source and fallback."""
-    feeds = load_feeds(FEEDS_FILE)
-    card_item = _build_recommended_item(feeds)
-
-    print(build_brush_card(card_item))
-    if card_item.get("link"):
-        print(f"原文：{card_item['link']}")
-    print("按钮：[👍 感兴趣] [👎 划走] [📖 深度阅读] [💾 收藏] [🔄 换一批]")
+    result = handle_command("/brush", [], "cli-user", {})
+    print(result.get("message", ""))
+    buttons = result.get("buttons", [])
+    if buttons:
+        button_texts = []
+        for row in buttons:
+            row_labels = " ".join("[{0}]".format(btn.get("text", "")) for btn in row)
+            button_texts.append(row_labels)
+        print("按钮：" + " | ".join(button_texts))
     return 0
 
 

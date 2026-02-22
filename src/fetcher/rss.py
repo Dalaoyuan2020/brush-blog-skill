@@ -215,6 +215,26 @@ def pick_article_from_pool(
     """
     Pick one article from content pool. Priority category ranks first.
     """
+    candidates = list_articles_from_pool(
+        db_path=db_path,
+        priority_category=priority_category,
+        exclude_item_keys=exclude_item_keys,
+        limit=100,
+    )
+    if not candidates:
+        return None
+    return candidates[0]
+
+
+def list_articles_from_pool(
+    db_path: Union[str, Path],
+    priority_category: str = "priority_hn_popular_2025",
+    exclude_item_keys: Optional[Sequence[str]] = None,
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
+    """
+    List candidate articles from content pool.
+    """
     init_content_db(db_path)
     path = str(db_path)
     exclude = set(exclude_item_keys or [])
@@ -227,22 +247,20 @@ def pick_article_from_pool(
             SELECT item_key, link, title, summary, category, source, feed_name, feed_url, tags_json, fetched_at
             FROM content_pool
             ORDER BY (category = ?) DESC, fetched_at DESC
-            LIMIT 100
+            LIMIT ?
             """,
-            (priority_category,),
+            (priority_category, max(1, int(limit))),
         ).fetchall()
     finally:
         conn.close()
 
+    candidates = []
     for row in rows:
         item_key = row["item_key"]
         if item_key in exclude:
             continue
-        return _row_to_article(dict(row))
-
-    if not rows:
-        return None
-    return _row_to_article(dict(rows[0]))
+        candidates.append(_row_to_article(dict(row)))
+    return candidates
 
 
 def _first_text(node: ET.Element, tags: List[str]) -> Optional[str]:

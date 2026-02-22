@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成（交互引擎）
-- **进度**: M3 里程碑 100%（阶段内） | 项目总进度约 36%（按 PLAN 11 天权重估算）
-- **最后更新**: Codex / 2026-02-22 20:28
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → 🔄 M4 推荐引擎进行中
+- **进度**: M4 里程碑 40%（阶段内） | 项目总进度约 43%（按 PLAN 11 天权重估算）
+- **最后更新**: Codex / 2026-02-22 20:39
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -68,6 +68,10 @@
 - 2026-02-22 20:08 / Codex：完成 `src/main.py` 交互主流程：`/brush like|skip|read|save|refresh` 全部落地；新增 `last_item`、`saved_items`、`interest_tags` 更新逻辑。
 - 2026-02-22 20:08 / Codex：M3 本地验收通过：CLI 下 `/brush read` 可展开详情，`/brush save` 可收藏并回写 profile，按钮链路完整。
 - 2026-02-22 20:28 / Codex：M3 代码已推送 GitHub `main`，提交 `8a04ecf`；`config.yaml` 已标记 `m3_interaction: true`。
+- 2026-02-22 20:33 / Codex：开始推进 M4（推荐引擎）；重写 `src/recommend/scorer.py`，实现 Interest/Knowledge/Diversity/Popularity 四分量打分与候选排序函数。
+- 2026-02-22 20:36 / Codex：完成 M4-2（评分接入），`src/main.py` 改为从 `content_pool` 拉候选并调用 `rank_items()` 选 Top1；新增 `source_history` 记录用于多样性分量。
+- 2026-02-22 20:39 / Codex：完成 M4-3（交互回归验证），`/brush -> like -> skip -> save -> read` 命令链路通过；候选结果可按评分切换不同来源。
+- 2026-02-22 20:39 / Codex：修复回归：`run_brush()` 已改为复用 `handle_command()`，消除 `_build_recommended_item()` 参数不匹配问题。
 - 2026-02-22 20:06 / Codex：开始推进 M3（交互引擎）；完成 `src/interaction/telegram.py` 扩展，新增统一按钮布局、深度阅读消息与收藏反馈消息构造函数。
 
 ## 测试验收（VPS）
