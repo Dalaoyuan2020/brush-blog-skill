@@ -7,7 +7,7 @@
 ## 当前状态
 - **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成
 - **进度**: 项目总进度 100%（M1-M8 全部完成并通过 VPS 验收）
-- **最后更新**: Codex / 2026-02-23 02:13
+- **最后更新**: Codex / 2026-02-23 02:14
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -99,6 +99,7 @@
 - 2026-02-23 02:02 / Codex：完成 M8-3（本地自动化验收），执行 `python3 scripts/m8_smoke_test.py` 通过（PASS），并完成 `src/main.py` 与脚本语法编译检查。
 - 2026-02-23 02:06 / Codex：完成展板同步：通过 Notion API 向项目页追加 M8 进行中 callout（commit `51516c5`，附 VPS 验收动作）。
 - 2026-02-23 02:13 / Codex：接收 claw 管家 M8 最终验收（commit `bb53ee9`）：`M8 smoke test PASS`，命令链路/行为事件/保存笔记全部通过，项目状态收口为 M1-M8 全完成。
+- 2026-02-23 02:14 / Codex：完成最终展板同步：通过 Notion API 追加“项目完成（100%）”callout，记录最终收口提交 `b259cf8` 与验收结论。
 
 ## 测试验收（VPS，M8 最终）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
