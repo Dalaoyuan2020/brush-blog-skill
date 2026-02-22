@@ -54,6 +54,7 @@
 - 2026-02-22 18:57 / Codex：完成 M2-2（RSS 解析），增强 `src/fetcher/rss.py`：新增 `collect_latest_articles()`，按 `priority_hn_popular_2025` 优先批量抓取并输出标准化文章结构。
 - 2026-02-22 19:37 / Codex：完成 M2-3（主链路接入），`src/main.py` 改为 `/brush` 统一走 `_build_recommended_item()` 使用批量抓取结果，抓取失败自动回退 mock；`handle_command` 与 CLI 均支持输出 `原文` 链接。
 - 2026-02-22 19:37 / Codex：本地验收通过：`python3 src/main.py /brush` 与 `PYTHONPATH=src python3 -c \"from main import handle_command ...\"` 均返回卡片、按钮、原文链接。
+- 2026-02-22 19:40 / Codex：已将 M2 当前进展推送 GitHub `main`，提交 `e451908`，可在 VPS 直接 `git pull` 复测。
 
 ## 测试验收（VPS）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
