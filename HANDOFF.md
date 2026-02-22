@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: 🟢 M1 完成 → M2 预实现中（优先 RSS 源接入）
-- **进度**: 100% — M1 已验收；已开始补充真实 RSS 取文链路
-- **最后更新**: Codex / 2026-02-22 12:25
+- **阶段**: 🟢 M1 完成 → Skill 打包标准化进行中
+- **进度**: 100% — M1 已验收；正在补齐 OpenClaw/ClawHub Skill 规范文件
+- **最后更新**: Codex / 2026-02-22 12:35
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -44,6 +44,9 @@
 - 2026-02-22 12:10 / Codex：新增 `docs/CLAW_MANAGER_TEST_MANUAL.md`，包含 claw 管家测试步骤、检查项、可复制指令、失败上报模板。
 - 2026-02-22 12:10 / Codex：本地验证通过，`python3 src/main.py /brush` 已输出优先源真实文章（来源 `simonwillison.net`）及原文链接。
 - 2026-02-22 12:25 / Codex：已提交并推送 M1 到 GitHub `main` 分支，提交 `7236976`，可在 VPS 直接 `git pull` 后运行测试。
+- 2026-02-22 12:34 / Codex：新增仓库根目录 `SKILL.md`（`name: brush`、`user-invocable: true`、`{baseDir}` 执行步骤），将项目从“代码仓库”补齐为“可识别 skill 包”入口。
+- 2026-02-22 12:35 / Codex：将 `docs/CLAW_MANAGER_TEST_MANUAL.md` 改为 VPS/Skill 测试流程（GitHub 拉取→执行 `/brush`）；`README.md` 补充 skill 入口与 VPS 快速测试指令。
+- 2026-02-22 12:35 / Codex：回归验证通过，`python3 src/main.py /brush` 输出正常。
 
 ## 问题区
 - 非阻塞：本机无 `python` 命令（仅有 `python3`），校验脚本已改用 `python3` 执行。

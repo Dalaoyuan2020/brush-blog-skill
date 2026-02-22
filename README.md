@@ -1,10 +1,11 @@
-# 🦞 刷博客 Skill
+# 🦞 刷博客 Skill（Claw Skill）
 
 **像刷抖音一样学顶级博客，一站式知识沉淀**
 
-## 项目信息
+## Skill 信息
 
-- **平台**: Moltbot (Skill 形式)
+- **平台**: OpenClaw / ClawHub Skill
+- **skill 入口**: `SKILL.md`（`name: brush`，支持 `/brush`）
 - **数据源**: RSS（可扩展到 Twitter、YouTube）
 - **推荐算法**: 规则+权重，先简单后优化
 - **状态**: 🟡 开发中
@@ -19,10 +20,11 @@
 | Claude Code | 线下 | 代码编写、迭代 |
 | 龍蝦 (小羊一号) | VPS / Moltbot | 测试、部署、发布 |
 
-## 项目结构
+## 结构
 
 ```
 brush-blog-skill/
+├── SKILL.md              ← Skill 标准入口文件
 ├── README.md              ← 项目说明
 ├── HANDOFF.md             ← 交接文档（Agent 间接力棒）
 ├── PLAN.md                ← Opus 产出的技术路线
@@ -30,6 +32,15 @@ brush-blog-skill/
 ├── AGENT_WORKFLOW.md      ← Agent Team 工作流说明
 ├── src/                   ← 代码
 └── tests/                 ← 测试
+```
+
+## VPS 快速测试
+
+```bash
+git clone https://github.com/Dalaoyuan2020/brush-blog-skill.git
+cd brush-blog-skill
+git checkout main
+python3 src/main.py /brush
 ```
 
 ## 通信机制

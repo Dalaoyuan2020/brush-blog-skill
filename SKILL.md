@@ -1,46 +1,44 @@
 ---
-name: brush-blog
-description: 像刷抖音一样学顶级博客，一站式知识沉淀
-metadata: {"clawdbot":{"emoji":"🦞"}}
+name: brush
+description: 像刷抖音一样学顶级博客，一站式知识沉淀。Use this skill for /brush blog discovery.
+user-invocable: true
+metadata: {"clawdbot":{"emoji":"🦞"},"openclaw":{"emoji":"📰","homepage":"https://github.com/Dalaoyuan2020/brush-blog-skill","requires":{"anyBins":["python3"]}}}
 ---
 
 # 🦞 刷博客 Skill
 
-**像刷抖音一样学顶级博客，一站式知识沉淀**
+像刷抖音一样学顶级博客，一站式知识沉淀。
 
 ## 命令
 
 - `/brush` - 开始刷博客
-- `/brush like` - 标记感兴趣
-- `/brush skip` - 划走
-- `/brush read` - 深度阅读
-- `/brush save` - 收藏到知识库
-- `/brush refresh` - 换一批
+- `/brush like` - 标记感兴趣（预留）
+- `/brush skip` - 划走（预留）
+- `/brush read` - 深度阅读（预留）
+- `/brush save` - 收藏到知识库（预留）
+- `/brush refresh` - 换一批（预留）
 
-## 功能
+## 执行流程（当前已实现）
 
-1. **冷启动** - 首次使用推送 6 条不同领域内容
-2. **信息流** - 一次一条，上下滑动浏览
-3. **交互反馈** - 感兴趣/不感兴趣快速反馈
-4. **行为收集** - 停留时间、是否追问、是否收藏
-5. **知识沉淀** - 一键存到 Notion / NotebookLM
-6. **智能推荐** - 越用越准
+1. 执行命令：
+   `python3 {baseDir}/src/main.py /brush`
+2. 若 `python3` 不可用，回退：
+   `python {baseDir}/src/main.py /brush`
+3. 将命令输出直接回传给用户。
 
-## 核心目标
+## 输出预期
 
-| 目标 | 衡量指标 |
-|------|----------|
-| 爽 | 停留时间 |
-| 准 | 点击率、收藏率 |
-| 惊喜 | 发现新领域 |
+- 以 `📰 博客卡片` 开头
+- 包含按钮提示：
+  `[👍 感兴趣] [👎 划走] [📖 深度阅读] [💾 收藏] [🔄 换一批]`
+- RSS 抓取成功时包含 `原文：<url>`
 
-## 技术栈
+## 数据优先级
 
-- Moltbot Skill + Telegram
-- RSS 内容采集
-- Python 推荐算法
-- Notion 知识存储
+优先读取 `priority_hn_popular_2025`：
+`{baseDir}/data/feeds.json`
 
-## GitHub
+## 失败处理
 
-https://github.com/Dalaoyuan2020/brush-blog-skill
+- RSS/网络失败：回退假数据卡片，命令不崩溃。
+- 命令执行失败：返回错误摘要并提示重试。

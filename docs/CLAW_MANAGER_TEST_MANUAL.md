@@ -1,17 +1,23 @@
-# claw 管家功能测试手册（刷博客 Skill）
+# claw 管家功能测试手册（刷博客 Skill / VPS 版）
 
 ## 1. 测试目标
 验证 `/brush` 命令在当前版本可用，并且优先采用用户指定 RSS 来源（`https://t.co/dwAiIjlXet` 对应 Gist OPML）中的文章。
 
 ## 2. 测试前准备
-1. 进入项目目录：
+1. 在 VPS 获取最新版代码：
    ```bash
-   cd /Users/lvzhiyuan/Documents/CodeX_agent/brush-blog-skill
+   git clone https://github.com/Dalaoyuan2020/brush-blog-skill.git
+   cd brush-blog-skill
+   git checkout main
+   git pull origin main
    ```
-2. 确认 Python 版本命令使用 `python3`（环境无 `python` 别名）。
+2. 确认 `python3` 可用：
+   ```bash
+   python3 --version
+   ```
 3. 网络可访问外网 RSS 站点。
 
-## 3. 本地最小测试步骤（必须执行）
+## 3. Skill 模式最小测试步骤（必须执行）
 1. 执行：
    ```bash
    python3 src/main.py /brush
@@ -29,10 +35,16 @@
 ## 4. claw 管家执行指令（可直接复制）
 
 ```text
-请按“刷博客 Skill 功能测试手册”执行一轮功能测试，目标是验证 /brush 可用且优先使用指定 RSS 源。
+请按“刷博客 Skill 功能测试手册（VPS版）”执行一轮功能测试，目标是验证 /brush 可用且优先使用指定 RSS 源。
 
-项目路径：/Users/lvzhiyuan/Documents/CodeX_agent/brush-blog-skill
-执行命令：python3 src/main.py /brush
+仓库：https://github.com/Dalaoyuan2020/brush-blog-skill
+分支：main
+
+步骤：
+1) git clone https://github.com/Dalaoyuan2020/brush-blog-skill.git
+2) cd brush-blog-skill
+3) git checkout main && git pull origin main
+4) python3 src/main.py /brush
 
 请你按以下检查项输出测试报告：
 1) 命令是否成功退出（exit code）
@@ -55,8 +67,9 @@
 时间：YYYY-MM-DD HH:MM
 环境：本机 / python3 --version
 步骤：
-1. cd .../brush-blog-skill
-2. python3 src/main.py /brush
+1. git clone ... && cd brush-blog-skill
+2. git checkout main && git pull origin main
+3. python3 src/main.py /brush
 
 实际结果：
 - ...
@@ -70,3 +83,9 @@
 初步判断：
 - ...
 ```
+
+## 6. 说明（Skill 结构）
+
+- 本仓库已包含标准 skill 入口：`SKILL.md`
+- `/brush` 对应 skill 名 `brush`（`user-invocable: true`）
+- 运行逻辑通过 `python3 {baseDir}/src/main.py /brush` 执行
