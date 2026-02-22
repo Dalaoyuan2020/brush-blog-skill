@@ -48,6 +48,19 @@
    - 断网或故意改错首条 RSS URL 后重跑
    - 预期仍能输出卡片（假数据回退），命令不崩溃
 
+## 3.1 冷启动测试（M7，建议执行）
+1. 使用全新用户（或删除对应 profile 文件）后执行：
+   ```bash
+   python3 src/main.py /brush
+   python3 src/main.py /brush like
+   python3 src/main.py /brush skip
+   python3 src/main.py /brush like
+   ```
+2. 预期：
+   - 首次 `/brush` 出现“欢迎 + 冷启动进度”文案
+   - 冷启动阶段按钮为“这个领域感兴趣/下一个领域”
+   - 选择满 2 个领域后输出：`✅ 冷启动完成，已进入智能推荐。`
+
 ## 4. claw 管家执行指令（可直接复制）
 
 ```text

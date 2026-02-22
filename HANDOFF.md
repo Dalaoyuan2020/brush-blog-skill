@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成
-- **进度**: 项目总进度约 72%（按 PLAN 里程碑完成度估算，M7/M8 待做）
-- **最后更新**: Codex / 2026-02-23 00:34
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成
+- **进度**: 项目总进度约 86%（M1-M7 完成，剩余 M8 测试发布收尾）
+- **最后更新**: Codex / 2026-02-23 01:06
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -88,6 +88,11 @@
 - 2026-02-23 00:31 / Codex：完成 M6-4（文档对齐），更新 `SKILL.md` 命令说明（去除“预留”标记）与 `docs/CLAW_MANAGER_TEST_MANUAL.md` 全链路测试项（新增 save 沉淀与行为日志校验）。
 - 2026-02-23 00:33 / Codex：完成 M6-5（稳定性补丁），为 `/brush save` 沉淀流程增加异常兜底；即使本地/Notion 写入失败，也不会影响“收藏成功”主流程。
 - 2026-02-23 00:34 / Codex：完成展板同步：通过 Notion API 向项目页追加 M6 完成 callout（commit `96d8f3d`、能力变化、下一步 M7）。
+- 2026-02-23 00:43 / Codex：完成 M7-1（冷启动交互层），在 `src/interaction/telegram.py` 新增 `build_cold_start_buttons()`，用于新用户领域选择流程。
+- 2026-02-23 00:48 / Codex：完成 M7-2（冷启动主链路），`src/main.py` 新增新用户冷启动状态机：首次 `/brush` 进入 6 类种子内容引导，`/brush like|skip|refresh` 在冷启动阶段用于领域选择；选满 2 个领域后自动切换到常规推荐流。
+- 2026-02-23 01:02 / Codex：完成 M7-3（兼容性与回归），修复冷启动状态引用问题（`current_index` 递进失效）；新增“历史老用户自动跳过冷启动”兼容逻辑，保证已有用户不被重新引导。
+- 2026-02-23 01:04 / Codex：完成 M7-4（验收），本地回归通过：新用户 `/brush -> like -> skip -> like` 会输出“冷启动完成”；完成后 `/brush read|save|refresh` 正常；`python3 -m py_compile` 通过。
+- 2026-02-23 01:06 / Codex：完成 M7-5（配置与文档对齐），`config.yaml` 标记 `m7_cold_start: true`，并更新 `SKILL.md`、`README.md`、`docs/CLAW_MANAGER_TEST_MANUAL.md` 的冷启动说明与测试步骤。
 
 ## 测试验收（VPS）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`

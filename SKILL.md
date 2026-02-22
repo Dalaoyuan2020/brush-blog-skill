@@ -18,6 +18,8 @@ metadata: {"clawdbot":{"emoji":"🦞"},"openclaw":{"emoji":"📰","homepage":"ht
 - `/brush save` - 收藏并沉淀到知识库（本地 JSONL，可选 Notion）
 - `/brush refresh` - 换一批推荐
 
+新用户首次执行 `/brush` 会自动进入冷启动：先看不同领域种子内容，点 `👍` 选满 2 个感兴趣领域后自动切换到常规推荐流。
+
 ## 执行流程（当前已实现）
 
 1. 执行命令：

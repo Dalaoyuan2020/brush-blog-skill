@@ -35,6 +35,20 @@ def build_brush_buttons() -> List[List[Dict[str, str]]]:
     ]
 
 
+def build_cold_start_buttons() -> List[List[Dict[str, str]]]:
+    """Return buttons used in cold-start onboarding flow."""
+    return [
+        [
+            {"text": "👍 这个领域感兴趣", "callback_data": "/brush like"},
+            {"text": "👎 下一个领域", "callback_data": "/brush skip"},
+        ],
+        [
+            {"text": "📖 先读这篇", "callback_data": "/brush read"},
+            {"text": "🔄 换个领域", "callback_data": "/brush refresh"},
+        ],
+    ]
+
+
 def build_deep_read_message(item: Dict[str, Any]) -> str:
     """Build expanded reading text for last recommended article."""
     title = item.get("title", "Untitled")

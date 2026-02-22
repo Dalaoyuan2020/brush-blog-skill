@@ -45,5 +45,5 @@ milestones:
   m4_recommend: true
   m5_tracker: true
   m6_sink: true
-  m7_cold_start: false
+  m7_cold_start: true
   m8_release: false

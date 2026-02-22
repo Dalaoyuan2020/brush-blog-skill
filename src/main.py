@@ -18,6 +18,7 @@ from fetcher.rss import (
 from interaction.telegram import (
     build_brush_buttons,
     build_brush_card,
+    build_cold_start_buttons,
     build_deep_read_message,
     build_saved_message,
 )
@@ -34,6 +35,32 @@ SAVED_NOTES_FILE = ROOT_DIR / "data" / "saved_notes.jsonl"
 READ_HISTORY_LIMIT = 100
 SAVED_ITEMS_LIMIT = 200
 SOURCE_HISTORY_LIMIT = 50
+COLD_START_MIN_SELECTIONS = 2
+COLD_START_MAX_CATEGORIES = 6
+COLD_START_CATEGORY_ORDER = [
+    "tech_programming",
+    "ai_ml",
+    "business_startup",
+    "design_product",
+    "science_general",
+    "priority_hn_popular_2025",
+]
+COLD_START_CATEGORY_LABELS = {
+    "tech_programming": "技术/编程",
+    "ai_ml": "AI/ML",
+    "business_startup": "商业/创业",
+    "design_product": "设计/产品",
+    "science_general": "科学/通识",
+    "priority_hn_popular_2025": "热门精选",
+}
+COLD_START_CATEGORY_ALIASES = {
+    "tech_programming": "tech",
+    "ai_ml": "ai",
+    "business_startup": "biz",
+    "design_product": "design",
+    "science_general": "science",
+    "priority_hn_popular_2025": "popular",
+}
 
 
 def _build_mock_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
@@ -164,6 +191,14 @@ def _default_profile() -> Dict[str, Any]:
         "source_history": [],
         "saved_items": [],
         "last_item": {},
+        "cold_start": {
+            "active": True,
+            "completed": False,
+            "seed_items": [],
+            "current_index": 0,
+            "selected_categories": [],
+            "seen_categories": [],
+        },
     }
 
 
@@ -243,6 +278,245 @@ def _build_brush_response(item: Dict[str, Any]) -> Dict[str, Any]:
         "message": _build_card_message(item),
         "buttons": build_brush_buttons(),
     }
+
+
+def _ensure_cold_start_state(profile: Dict[str, Any]) -> Dict[str, Any]:
+    state = profile.get("cold_start")
+    if "cold_start" in profile and isinstance(state, dict):
+        completed = bool(state.get("completed", False))
+        active = bool(state.get("active", not completed))
+        seed_items = state.get("seed_items", [])
+        current_index = state.get("current_index", 0)
+        selected_categories = state.get("selected_categories", [])
+        seen_categories = state.get("seen_categories", [])
+    else:
+        has_history = bool(profile.get("read_history")) or bool(profile.get("interest_tags"))
+        completed = has_history
+        active = not completed
+        seed_items = []
+        current_index = 0
+        selected_categories = []
+        seen_categories = []
+
+    if not isinstance(seed_items, list):
+        seed_items = []
+    if not isinstance(selected_categories, list):
+        selected_categories = []
+    if not isinstance(seen_categories, list):
+        seen_categories = []
+
+    try:
+        current_index = int(current_index)
+    except Exception:
+        current_index = 0
+    if current_index < 0:
+        current_index = 0
+
+    normalized = {
+        "active": active,
+        "completed": completed,
+        "seed_items": seed_items,
+        "current_index": current_index,
+        "selected_categories": selected_categories,
+        "seen_categories": seen_categories,
+    }
+    profile["cold_start"] = normalized
+    return normalized
+
+
+def _is_cold_start_active(profile: Dict[str, Any]) -> bool:
+    state = _ensure_cold_start_state(profile)
+    return bool(state.get("active", False)) and not bool(state.get("completed", False))
+
+
+def _pick_cold_start_categories(feeds: Dict[str, List[Dict[str, Any]]]) -> List[str]:
+    categories = []
+    for category in COLD_START_CATEGORY_ORDER:
+        if category in feeds and category not in categories:
+            categories.append(category)
+    if len(categories) >= COLD_START_MAX_CATEGORIES:
+        return categories[:COLD_START_MAX_CATEGORIES]
+
+    for category in feeds.keys():
+        if category in categories:
+            continue
+        categories.append(category)
+        if len(categories) >= COLD_START_MAX_CATEGORIES:
+            break
+    return categories
+
+
+def _build_seed_item(feeds: Dict[str, List[Dict[str, Any]]], category: str) -> Dict[str, Any]:
+    article = None
+    try:
+        articles = collect_latest_articles(
+            feeds,
+            priority_category=category,
+            per_category_limit=1,
+            max_items=1,
+            timeout=8,
+        )
+    except Exception:
+        articles = []
+    if articles:
+        article = articles[0]
+
+    feed_source = feeds.get(category, [{}])[0] if feeds.get(category) else {}
+    if not article:
+        source_name = feed_source.get("site", feed_source.get("name", "unknown"))
+        seed = {
+            "title": "领域种子：{0}".format(feed_source.get("name", category)),
+            "summary": "这是冷启动种子内容，用于快速了解你的阅读偏好。",
+            "tags": category.split("_"),
+            "source": source_name,
+            "link": "",
+            "item_key": "",
+            "category": category,
+            "cold_start_alias": COLD_START_CATEGORY_ALIASES.get(category, category),
+            "cold_start_label": COLD_START_CATEGORY_LABELS.get(category, category),
+        }
+        return seed
+
+    article["category"] = category
+    article["cold_start_alias"] = COLD_START_CATEGORY_ALIASES.get(category, category)
+    article["cold_start_label"] = COLD_START_CATEGORY_LABELS.get(category, category)
+    return article
+
+
+def _build_seed_items(feeds: Dict[str, List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
+    seeds = []
+    categories = _pick_cold_start_categories(feeds)
+    for category in categories:
+        seeds.append(_build_seed_item(feeds, category))
+    return seeds
+
+
+def _current_seed_item(profile: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    state = _ensure_cold_start_state(profile)
+    seed_items = state.get("seed_items", [])
+    if not seed_items:
+        return None
+    current_index = int(state.get("current_index", 0))
+    if current_index >= len(seed_items):
+        current_index = current_index % len(seed_items)
+    if current_index < 0:
+        current_index = 0
+    state["current_index"] = current_index
+    return seed_items[current_index]
+
+
+def _cold_start_header(profile: Dict[str, Any], item: Dict[str, Any]) -> str:
+    state = _ensure_cold_start_state(profile)
+    selected_categories = state.get("selected_categories", [])
+    selected_count = len(selected_categories)
+    index = int(state.get("current_index", 0)) + 1
+    total = len(state.get("seed_items", []))
+    label = item.get("cold_start_label", COLD_START_CATEGORY_LABELS.get(item.get("category", ""), "未分类"))
+    alias = item.get("cold_start_alias", COLD_START_CATEGORY_ALIASES.get(item.get("category", ""), "unknown"))
+    selected_text = "、".join(
+        COLD_START_CATEGORY_LABELS.get(category, category) for category in selected_categories[-6:]
+    )
+    if not selected_text:
+        selected_text = "暂无"
+
+    return (
+        "👋 欢迎来到刷博客！我先推几篇不同领域的内容，帮你快速建立口味画像。\n"
+        "冷启动进度：已选 {0}/{1} 个感兴趣领域（第 {2}/{3} 个领域）\n"
+        "当前领域：{4}（{5}）\n"
+        "已选领域：{6}\n"
+        "操作提示：点 👍 选择该领域；选满 2 个后将自动进入智能推荐。\n\n".format(
+            selected_count,
+            COLD_START_MIN_SELECTIONS,
+            index,
+            max(1, total),
+            label,
+            alias,
+            selected_text,
+        )
+    )
+
+
+def _cold_start_response(user_id: str, profile: Dict[str, Any], feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+    state = _ensure_cold_start_state(profile)
+    if not state.get("seed_items"):
+        state["seed_items"] = _build_seed_items(feeds)
+        state["current_index"] = 0
+
+    item = _current_seed_item(profile)
+    if not item:
+        item = _build_mock_item(feeds)
+        item["category"] = "unknown"
+        item["cold_start_alias"] = "unknown"
+        item["cold_start_label"] = "未分类"
+
+    profile["last_item"] = item
+    _save_profile(user_id, profile)
+    _safe_log_event(user_id, "cold_start_view", item, metadata={"mode": "cold_start"})
+
+    return {
+        "message": _cold_start_header(profile, item) + _build_card_message(item),
+        "buttons": build_cold_start_buttons(),
+    }
+
+
+def _advance_cold_start(
+    user_id: str,
+    profile: Dict[str, Any],
+    feeds: Dict[str, List[Dict[str, Any]]],
+    action: str,
+) -> Dict[str, Any]:
+    state = _ensure_cold_start_state(profile)
+    item = _current_seed_item(profile) or {}
+    state = _ensure_cold_start_state(profile)
+    category = item.get("category", "")
+
+    if action == "like" and category:
+        selected = state.get("selected_categories", [])
+        if category not in selected:
+            selected.append(category)
+        state["selected_categories"] = selected
+        profile = _update_interest_tags(profile, item.get("tags", []) if isinstance(item.get("tags", []), list) else [], 3)
+        _safe_log_event(
+            user_id,
+            "cold_start_like",
+            item,
+            metadata={"selected_categories": list(selected)},
+        )
+    else:
+        _safe_log_event(user_id, "cold_start_skip", item, metadata={"action": action})
+
+    seen = state.get("seen_categories", [])
+    if category and category not in seen:
+        seen.append(category)
+    state["seen_categories"] = seen[-COLD_START_MAX_CATEGORIES:]
+
+    total = len(state.get("seed_items", []))
+    if total > 0:
+        state["current_index"] = (int(state.get("current_index", 0)) + 1) % total
+
+    if len(state.get("selected_categories", [])) >= COLD_START_MIN_SELECTIONS:
+        state["active"] = False
+        state["completed"] = True
+        state["seed_items"] = []
+        state["current_index"] = 0
+        _save_profile(user_id, profile)
+        _safe_log_event(
+            user_id,
+            "cold_start_complete",
+            item,
+            metadata={"selected_categories": state.get("selected_categories", [])},
+        )
+        response = _next_item_response(user_id, profile, feeds)
+        response["message"] = "✅ 冷启动完成，已进入智能推荐。\n\n" + response["message"]
+        return response
+
+    _save_profile(user_id, profile)
+    response = _cold_start_response(user_id, profile, feeds)
+    if action == "like":
+        response["message"] = "✅ 已记录该领域偏好（+3）\n\n" + response["message"]
+    else:
+        response["message"] = "⏭️ 已切换到下一个领域\n\n" + response["message"]
+    return response
 
 
 def _next_item_response(user_id: str, profile: Dict[str, Any], feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
@@ -344,44 +618,58 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
     """
     command = _merge_command_and_args(command, args)
     profile = _load_profile(user_id) or _default_profile()
+    _ensure_cold_start_state(profile)
 
     # 主命令：开始刷博客
     if command == "/brush":
         feeds = load_feeds(FEEDS_FILE)
+        if _is_cold_start_active(profile):
+            return _cold_start_response(user_id, profile, feeds)
         return _next_item_response(user_id, profile, feeds)
     
     # 按钮回调处理
     elif command == "/brush like":
+        feeds = load_feeds(FEEDS_FILE)
+        if _is_cold_start_active(profile):
+            return _advance_cold_start(user_id, profile, feeds, action="like")
         last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
         tags = last_item.get("tags", []) if isinstance(last_item.get("tags", []), list) else []
         profile = _update_interest_tags(profile, tags, delta=2)
         _save_profile(user_id, profile)
         _safe_log_event(user_id, "like", last_item)
-        feeds = load_feeds(FEEDS_FILE)
         response = _next_item_response(user_id, profile, feeds)
         response["message"] = "✅ 已记录偏好（+2）\n\n" + response["message"]
         return response
     
     elif command == "/brush skip":
+        feeds = load_feeds(FEEDS_FILE)
+        if _is_cold_start_active(profile):
+            return _advance_cold_start(user_id, profile, feeds, action="skip")
         last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
         tags = last_item.get("tags", []) if isinstance(last_item.get("tags", []), list) else []
         profile = _update_interest_tags(profile, tags, delta=-1)
         _save_profile(user_id, profile)
         _safe_log_event(user_id, "skip", last_item)
-        feeds = load_feeds(FEEDS_FILE)
         response = _next_item_response(user_id, profile, feeds)
         response["message"] = "⏭️ 已跳过（-1）\n\n" + response["message"]
         return response
     
     elif command == "/brush read":
+        action_buttons = build_cold_start_buttons() if _is_cold_start_active(profile) else build_brush_buttons()
         last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
         if not last_item:
             _safe_log_event(user_id, "read_miss", metadata={"reason": "no_last_item"})
-            return {"message": "还没有可展开的文章，先试试 /brush", "buttons": build_brush_buttons()}
+            return {"message": "还没有可展开的文章，先试试 /brush", "buttons": action_buttons}
         _safe_log_event(user_id, "read", last_item)
-        return {"message": build_deep_read_message(last_item), "buttons": build_brush_buttons()}
+        return {"message": build_deep_read_message(last_item), "buttons": action_buttons}
     
     elif command == "/brush save":
+        if _is_cold_start_active(profile):
+            _safe_log_event(user_id, "cold_start_save_blocked", metadata={"reason": "cold_start_not_completed"})
+            return {
+                "message": "冷启动进行中，请先用 👍 选择至少 2 个感兴趣领域，再使用收藏。",
+                "buttons": build_cold_start_buttons(),
+            }
         last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
         if not last_item:
             _safe_log_event(user_id, "save_miss", metadata={"reason": "no_last_item"})
@@ -411,6 +699,8 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
     
     elif command == "/brush refresh":
         feeds = load_feeds(FEEDS_FILE)
+        if _is_cold_start_active(profile):
+            return _advance_cold_start(user_id, profile, feeds, action="refresh")
         _safe_log_event(
             user_id,
             "refresh",
