@@ -7,7 +7,7 @@
 ## 当前状态
 - **阶段**: ✅ M1 完成（VPS 复测通过） → ✅ M2 开发完成（待 VPS 复测确认）
 - **进度**: M2 里程碑 100%（阶段内） | 项目总进度约 18%（按 PLAN 11 天权重估算）
-- **最后更新**: Codex / 2026-02-22 19:57
+- **最后更新**: Codex / 2026-02-22 20:00
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -62,6 +62,8 @@
 - 2026-02-22 19:52 / Codex：完成 M2-4（内容池存储层），在 `src/fetcher/rss.py` 增加 SQLite 能力：`init_content_db`、`upsert_articles`、`refresh_content_pool`、`pick_article_from_pool`，实现 RSS 抓取结果入库与按优先分类取文。
 - 2026-02-22 19:57 / Codex：完成 M2-5（主流程闭环），`src/main.py` 接入 `content.db`：`/brush` 先刷新内容池再取推荐，失败时回退实时抓取与 mock；新增 `read_history` 去重策略避免重复文章。
 - 2026-02-22 19:57 / Codex：完成 M2-6（验收与配置），本地验证通过（CLI/handle_command/SQLite 入库/profile 历史），并将 `config.yaml` 里程碑 `m2_fetcher` 设置为 `true`。
+- 2026-02-22 20:00 / Codex：已推送 M2 完成代码到 GitHub `main`，提交 `30326f2`。
+- 2026-02-22 20:00 / Codex：已同步 Notion 页面状态为 `M2 开发完成（待VPS验收）`，并追加 commit `30326f2` 的 M2 完成说明与验收请求。
 
 ## 测试验收（VPS）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
