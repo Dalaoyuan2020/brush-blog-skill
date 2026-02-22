@@ -2,7 +2,7 @@
 name: brush
 description: 像刷抖音一样学顶级博客，一站式知识沉淀。Use this skill for /brush blog discovery.
 user-invocable: true
-metadata: {"clawdbot":{"emoji":"🦞"},"openclaw":{"emoji":"📰","homepage":"https://github.com/Dalaoyuan2020/brush-blog-skill","requires":{"anyBins":["python3"]}}}
+metadata: {"clawdbot":{"emoji":"🦞"},"openclaw":{"emoji":"📰","homepage":"https://github.com/Dalaoyuan2020/brush-blog-skill","requires":{"anyBins":["python3"]},"supports":{"inlineButtons":true}}}
 ---
 
 # 🦞 刷博客 Skill

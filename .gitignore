@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# User data (don't push personal profiles)
+data/profiles/
+data/behavior_events.jsonl
+data/content.db
+
+# Backups
+*.bak.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

@@ -539,6 +539,7 @@ def _merge_command_and_args(command: str, args: List[str]) -> str:
 def _safe_log_event(
     user_id: str, action: str, item: Optional[Dict[str, Any]] = None, metadata: Optional[Dict[str, Any]] = None
 ) -> None:
+    """Log behavior event with error handling and console output for debugging."""
     try:
         log_behavior_event(
             events_path=BEHAVIOR_EVENTS_FILE,
@@ -547,8 +548,12 @@ def _safe_log_event(
             item=item,
             metadata=metadata,
         )
-    except Exception:
+        # Debug log for development
+        item_title = item.get("title", "unknown")[:50] if item else "none"
+        print(f"[DEBUG] Logged event: user={user_id}, action={action}, item={item_title}")
+    except Exception as e:
         # Behavior logging should not break command handling.
+        print(f"[DEBUG] Failed to log event: {e}")
         return
 
 
