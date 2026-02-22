@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → 🔄 M4 推荐引擎进行中
-- **进度**: M4 里程碑 50%（阶段内） | 项目总进度约 45%（按 PLAN 11 天权重估算）
-- **最后更新**: Codex / 2026-02-22 23:37
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → 🔄 M5 行为收集进行中
+- **进度**: M5 里程碑 40%（阶段内） | 项目总进度约 59%（按 PLAN 11 天权重估算）
+- **最后更新**: Codex / 2026-02-22 23:57
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -76,7 +76,11 @@
 - 2026-02-22 20:41 / Codex：已同步 Notion 面板 M4 进展；由于旧状态块已归档，改为新增状态段落与 M4 callout（commit `cdd48bf`）。
 - 2026-02-22 23:37 / Codex：完成“最后一块本地测试”：`/brush`、`/brush like`、`/brush skip`、`/brush read`、`/brush save` 全部通过；候选文章可跨来源切换（priority/tech/ai/design）。
 - 2026-02-22 23:37 / Codex：测试后已清理运行时数据（profile 临时文件、content_pool 行数据），仓库保持可复测状态。
-- 2026-02-22 20:06 / Codex：开始推进 M3（交互引擎）；完成 `src/interaction/telegram.py` 扩展，新增统一按钮布局、深度阅读消息与收藏反馈消息构造函数。
+- 2026-02-22 23:51 / Codex：接收 claw 管家 VPS 最终结论：`69648e6` 全量命令通过（/brush/like/skip/read/save），数据库 6 条内容，确认 M4 当前目标达成。
+- 2026-02-22 23:51 / Codex：标记里程碑开关 `m4_recommend: true`，并按 PLAN 启动 M5（行为收集）开发。
+- 2026-02-22 23:55 / Codex：完成 M5-1（行为日志模块），扩展 `src/tracker/behavior.py`：支持事件结构、JSONL 落盘、最近事件读取。
+- 2026-02-22 23:56 / Codex：完成 M5-2（主流程接入），`src/main.py` 在 `view/like/skip/read/save/refresh` 全链路写行为事件；失败不影响命令主流程。
+- 2026-02-22 23:57 / Codex：M5 本地验证通过：执行 `/brush` 相关命令后行为日志产生 7 条事件（view/like/read/save/refresh 等）；验证后已清理运行时样本数据。
 
 ## 测试验收（VPS）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`

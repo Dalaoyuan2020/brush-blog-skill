@@ -21,11 +21,13 @@ from interaction.telegram import (
     build_saved_message,
 )
 from recommend.scorer import rank_items
+from tracker.behavior import log_behavior_event
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FEEDS_FILE = ROOT_DIR / "data" / "feeds.json"
 CONTENT_DB = ROOT_DIR / "data" / "content.db"
 PROFILES_DIR = ROOT_DIR / "data" / "profiles"
+BEHAVIOR_EVENTS_FILE = ROOT_DIR / "data" / "behavior_events.jsonl"
 READ_HISTORY_LIMIT = 100
 SAVED_ITEMS_LIMIT = 200
 SOURCE_HISTORY_LIMIT = 50
@@ -246,6 +248,7 @@ def _next_item_response(user_id: str, profile: Dict[str, Any], feeds: Dict[str, 
     profile = _record_read_history(profile, card_item.get("item_key", ""))
     profile = _record_source_history(profile, card_item.get("source", ""))
     _save_profile(user_id, profile)
+    _safe_log_event(user_id, "view", card_item)
 
     return _build_brush_response(card_item)
 
@@ -254,6 +257,22 @@ def _merge_command_and_args(command: str, args: List[str]) -> str:
     if args and command.startswith("/"):
         return "{0} {1}".format(command, " ".join(args))
     return command
+
+
+def _safe_log_event(
+    user_id: str, action: str, item: Optional[Dict[str, Any]] = None, metadata: Optional[Dict[str, Any]] = None
+) -> None:
+    try:
+        log_behavior_event(
+            events_path=BEHAVIOR_EVENTS_FILE,
+            user_id=user_id,
+            action=action,
+            item=item,
+            metadata=metadata,
+        )
+    except Exception:
+        # Behavior logging should not break command handling.
+        return
 
 
 def handle_command(command: str, args: List[str], user_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -286,6 +305,7 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
         tags = last_item.get("tags", []) if isinstance(last_item.get("tags", []), list) else []
         profile = _update_interest_tags(profile, tags, delta=2)
         _save_profile(user_id, profile)
+        _safe_log_event(user_id, "like", last_item)
         feeds = load_feeds(FEEDS_FILE)
         response = _next_item_response(user_id, profile, feeds)
         response["message"] = "✅ 已记录偏好（+2）\n\n" + response["message"]
@@ -296,6 +316,7 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
         tags = last_item.get("tags", []) if isinstance(last_item.get("tags", []), list) else []
         profile = _update_interest_tags(profile, tags, delta=-1)
         _save_profile(user_id, profile)
+        _safe_log_event(user_id, "skip", last_item)
         feeds = load_feeds(FEEDS_FILE)
         response = _next_item_response(user_id, profile, feeds)
         response["message"] = "⏭️ 已跳过（-1）\n\n" + response["message"]
@@ -304,12 +325,15 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
     elif command == "/brush read":
         last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
         if not last_item:
+            _safe_log_event(user_id, "read_miss", metadata={"reason": "no_last_item"})
             return {"message": "还没有可展开的文章，先试试 /brush", "buttons": build_brush_buttons()}
+        _safe_log_event(user_id, "read", last_item)
         return {"message": build_deep_read_message(last_item), "buttons": build_brush_buttons()}
     
     elif command == "/brush save":
         last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
         if not last_item:
+            _safe_log_event(user_id, "save_miss", metadata={"reason": "no_last_item"})
             return {"message": "还没有可收藏的文章，先试试 /brush", "buttons": build_brush_buttons()}
         profile = _record_saved_item(profile, last_item)
         profile = _update_interest_tags(
@@ -318,10 +342,16 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
             delta=5,
         )
         _save_profile(user_id, profile)
+        _safe_log_event(user_id, "save", last_item)
         return {"message": build_saved_message(last_item), "buttons": build_brush_buttons()}
     
     elif command == "/brush refresh":
         feeds = load_feeds(FEEDS_FILE)
+        _safe_log_event(
+            user_id,
+            "refresh",
+            profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {},
+        )
         response = _next_item_response(user_id, profile, feeds)
         response["message"] = "🔄 已换一批\n\n" + response["message"]
         return response

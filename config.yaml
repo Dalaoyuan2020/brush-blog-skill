@@ -28,6 +28,7 @@ recommendation:
 tracking:
   interest_decay: 0.95
   read_history_limit: 100
+  behavior_events_file: data/behavior_events.jsonl
 
 sink:
   notion:
@@ -39,7 +40,7 @@ milestones:
   m1_scaffold: true
   m2_fetcher: true
   m3_interaction: true
-  m4_recommend: false
+  m4_recommend: true
   m5_tracker: false
   m6_sink: false
   m7_cold_start: false
