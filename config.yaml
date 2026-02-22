@@ -1,0 +1,46 @@
+app:
+  name: brush-blog-skill
+  env: dev
+  timezone: Asia/Shanghai
+
+commands:
+  brush: /brush
+
+data:
+  feeds_file: data/feeds.json
+  sqlite_file: data/content.db
+  profiles_dir: data/profiles
+
+telegram:
+  enabled: false
+  bot_token: ""
+  parse_mode: Markdown
+
+recommendation:
+  weights:
+    interest: 0.4
+    knowledge: 0.3
+    diversity: 0.2
+    popularity: 0.1
+  cold_start_diversity_weight: 0.4
+  quick_learn_interactions: 20
+
+tracking:
+  interest_decay: 0.95
+  read_history_limit: 100
+
+sink:
+  notion:
+    enabled: false
+    api_key: ""
+    database_id: ""
+
+milestones:
+  m1_scaffold: true
+  m2_fetcher: false
+  m3_interaction: false
+  m4_recommend: false
+  m5_tracker: false
+  m6_sink: false
+  m7_cold_start: false
+  m8_release: false

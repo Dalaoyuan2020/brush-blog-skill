@@ -1,0 +1,107 @@
+{
+  "priority_hn_popular_2025": [
+    {
+      "name": "Simon Willison",
+      "url": "https://simonwillison.net/atom/everything/",
+      "site": "simonwillison.net",
+      "source": "https://gist.github.com/emschwartz/e6d2bf860ccc367fe37ff953ba6de66b"
+    },
+    {
+      "name": "Jeff Geerling",
+      "url": "https://www.jeffgeerling.com/blog.xml",
+      "site": "jeffgeerling.com",
+      "source": "https://gist.github.com/emschwartz/e6d2bf860ccc367fe37ff953ba6de66b"
+    },
+    {
+      "name": "Sean Goedecke",
+      "url": "https://www.seangoedecke.com/rss.xml",
+      "site": "seangoedecke.com",
+      "source": "https://gist.github.com/emschwartz/e6d2bf860ccc367fe37ff953ba6de66b"
+    }
+  ],
+  "tech_programming": [
+    {
+      "name": "Hacker News Frontpage",
+      "url": "https://hnrss.org/frontpage",
+      "site": "news.ycombinator.com"
+    },
+    {
+      "name": "阮一峰的网络日志",
+      "url": "https://www.ruanyifeng.com/blog/atom.xml",
+      "site": "ruanyifeng.com"
+    },
+    {
+      "name": "CSS-Tricks",
+      "url": "https://css-tricks.com/feed/",
+      "site": "css-tricks.com"
+    }
+  ],
+  "ai_ml": [
+    {
+      "name": "Lil'Log",
+      "url": "https://lilianweng.github.io/index.xml",
+      "site": "lilianweng.github.io"
+    },
+    {
+      "name": "Distill",
+      "url": "https://distill.pub/rss.xml",
+      "site": "distill.pub"
+    },
+    {
+      "name": "Jay Alammar",
+      "url": "https://jalammar.github.io/feed.xml",
+      "site": "jalammar.github.io"
+    }
+  ],
+  "business_startup": [
+    {
+      "name": "Paul Graham Essays",
+      "url": "http://www.aaronsw.com/2002/feeds/pgessays.rss",
+      "site": "paulgraham.com"
+    },
+    {
+      "name": "a16z",
+      "url": "https://a16z.com/feed/",
+      "site": "a16z.com"
+    },
+    {
+      "name": "Y Combinator Blog",
+      "url": "https://www.ycombinator.com/blog/feed",
+      "site": "ycombinator.com"
+    }
+  ],
+  "design_product": [
+    {
+      "name": "Nielsen Norman Group",
+      "url": "https://www.nngroup.com/feed/rss/",
+      "site": "nngroup.com"
+    },
+    {
+      "name": "Intercom Blog",
+      "url": "https://www.intercom.com/blog/rss.xml",
+      "site": "intercom.com"
+    },
+    {
+      "name": "Smashing Magazine",
+      "url": "https://www.smashingmagazine.com/feed/",
+      "site": "smashingmagazine.com"
+    }
+  ],
+  "science_general": [
+    {
+      "name": "Wait But Why",
+      "url": "https://waitbutwhy.com/feed",
+      "site": "waitbutwhy.com"
+    },
+    {
+      "name": "Quanta Magazine",
+      "url": "https://www.quantamagazine.org/feed/",
+      "site": "quantamagazine.org"
+    },
+    {
+      "name": "Nautilus",
+      "url": "https://nautil.us/feed/",
+      "site": "nautil.us"
+    }
+  ]
+}
