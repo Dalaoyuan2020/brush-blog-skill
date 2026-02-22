@@ -7,7 +7,7 @@
 ## 当前状态
 - **阶段**: 🟢 M1 完成 → Skill 打包标准化进行中
 - **进度**: 100% — M1 已验收；正在补齐 OpenClaw/ClawHub Skill 规范文件
-- **最后更新**: Codex / 2026-02-22 12:35
+- **最后更新**: Codex / 2026-02-22 18:10
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -47,6 +47,7 @@
 - 2026-02-22 12:34 / Codex：新增仓库根目录 `SKILL.md`（`name: brush`、`user-invocable: true`、`{baseDir}` 执行步骤），将项目从“代码仓库”补齐为“可识别 skill 包”入口。
 - 2026-02-22 12:35 / Codex：将 `docs/CLAW_MANAGER_TEST_MANUAL.md` 改为 VPS/Skill 测试流程（GitHub 拉取→执行 `/brush`）；`README.md` 补充 skill 入口与 VPS 快速测试指令。
 - 2026-02-22 12:35 / Codex：回归验证通过，`python3 src/main.py /brush` 输出正常。
+- 2026-02-22 18:10 / Codex：解决远端并行变更导致的 `SKILL.md` rebase 冲突（add/add），已合并为统一 skill 描述并推送 `main`，提交 `57f246f`。
 
 ## 问题区
 - 非阻塞：本机无 `python` 命令（仅有 `python3`），校验脚本已改用 `python3` 执行。
