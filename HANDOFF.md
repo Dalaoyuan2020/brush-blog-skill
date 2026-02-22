@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: 🟢 M1 完成 → Skill 打包标准化进行中
-- **进度**: 100% — M1 已验收；正在补齐 OpenClaw/ClawHub Skill 规范文件
-- **最后更新**: Codex / 2026-02-22 18:10
+- **阶段**: ✅ M1 完成（VPS 复测通过） → M2 待启动
+- **进度**: 100% — M1 全部验收完成，Skill 入口与命令链路可用
+- **最后更新**: Codex / 2026-02-22 18:46
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -48,6 +48,18 @@
 - 2026-02-22 12:35 / Codex：将 `docs/CLAW_MANAGER_TEST_MANUAL.md` 改为 VPS/Skill 测试流程（GitHub 拉取→执行 `/brush`）；`README.md` 补充 skill 入口与 VPS 快速测试指令。
 - 2026-02-22 12:35 / Codex：回归验证通过，`python3 src/main.py /brush` 输出正常。
 - 2026-02-22 18:10 / Codex：解决远端并行变更导致的 `SKILL.md` rebase 冲突（add/add），已合并为统一 skill 描述并推送 `main`，提交 `57f246f`。
+- 2026-02-22 18:46 / Codex：接收 claw 管家 VPS 复测结果，确认 `bf83d92` 版本在 `/home/admin/clawd/github/brush-blog-skill` 执行 `python3 src/main.py /brush` 通过（exit code 0，卡片与按钮输出正常）。
+
+## 测试验收（VPS）
+- **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
+- **测试版本**: `bf83d92`
+- **执行命令**: `python3 src/main.py /brush`
+- **结果**: ✅ PASS
+- **证据摘要**:
+  - 命令成功退出（exit code 0）
+  - 输出博客卡片与按钮文案
+  - 来源命中 `priority_hn_popular_2025` 首条（`simonwillison.net`）
+  - “原文链接未显示”属于 M1 mock 回退路径，已标记低优先级，M2 真实采集阶段处理
 
 ## 问题区
 - 非阻塞：本机无 `python` 命令（仅有 `python3`），校验脚本已改用 `python3` 执行。
