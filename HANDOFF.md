@@ -7,7 +7,7 @@
 ## 当前状态
 - **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成
 - **进度**: 项目总进度约 72%（按 PLAN 里程碑完成度估算，M7/M8 待做）
-- **最后更新**: Codex / 2026-02-23 00:33
+- **最后更新**: Codex / 2026-02-23 00:34
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -87,6 +87,7 @@
 - 2026-02-23 00:30 / Codex：完成 M6-3（本地验收），`python3 -m py_compile` 与 `/brush -> like -> read -> save -> refresh` 回归通过；`data/saved_notes.jsonl` 已产出结构化笔记，`behavior_events.jsonl` 记录 `save` 的沉淀元数据。
 - 2026-02-23 00:31 / Codex：完成 M6-4（文档对齐），更新 `SKILL.md` 命令说明（去除“预留”标记）与 `docs/CLAW_MANAGER_TEST_MANUAL.md` 全链路测试项（新增 save 沉淀与行为日志校验）。
 - 2026-02-23 00:33 / Codex：完成 M6-5（稳定性补丁），为 `/brush save` 沉淀流程增加异常兜底；即使本地/Notion 写入失败，也不会影响“收藏成功”主流程。
+- 2026-02-23 00:34 / Codex：完成展板同步：通过 Notion API 向项目页追加 M6 完成 callout（commit `96d8f3d`、能力变化、下一步 M7）。
 
 ## 测试验收（VPS）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
