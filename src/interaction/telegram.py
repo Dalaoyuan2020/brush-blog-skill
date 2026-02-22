@@ -1,11 +1,8 @@
-"""Telegram interaction layer placeholder."""
 
-from __future__ import annotations
-
-from typing import Any
+from typing import Any, Union, Optional, Dict, List
 
 
-def build_brush_card(item: dict[str, Any]) -> str:
+def build_brush_card(item: Dict[str, Any]) -> str:
     """Build a plain-text card for a single blog item."""
     title = item.get("title", "Untitled")
     summary = item.get("summary", "No summary yet.")

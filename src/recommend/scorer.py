@@ -1,11 +1,8 @@
-"""Simple recommendation scoring placeholder."""
 
-from __future__ import annotations
-
-from typing import Any
+from typing import Any, Union, Optional, Dict, List
 
 
-def score_item(item: dict[str, Any]) -> float:
+def score_item(item: Dict[str, Any]) -> float:
     """Return a deterministic placeholder score for M1."""
     popularity = float(item.get("popularity", 0.5))
     diversity = float(item.get("diversity", 0.5))

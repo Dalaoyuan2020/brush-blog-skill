@@ -1,16 +1,13 @@
-"""RSS feed loading/fetching utilities for the brush-blog skill."""
-
-from __future__ import annotations
 
 import json
 import re
 import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any
+from typing import Any, Union, Optional, Dict, List
 
 
-def load_feeds(feeds_path: str | Path) -> dict[str, list[dict[str, Any]]]:
+def load_feeds(feeds_path: Union[str, Path]) -> Dict[str, List[Dict[str, Any]]]:
     """Load RSS feed definitions from JSON file."""
     path = Path(feeds_path)
     with path.open("r", encoding="utf-8") as f:
@@ -22,7 +19,7 @@ def load_feeds(feeds_path: str | Path) -> dict[str, list[dict[str, Any]]]:
     return data
 
 
-def fetch_latest_article(feed_url: str, timeout: int = 10) -> dict[str, str] | None:
+def fetch_latest_article(feed_url: str, timeout: int = 10) -> Optional[Dict[str, str]]:
     """Fetch and parse one latest article from an RSS/Atom feed URL."""
     request = urllib.request.Request(
         feed_url,
@@ -54,7 +51,7 @@ def fetch_latest_article(feed_url: str, timeout: int = 10) -> dict[str, str] | N
     }
 
 
-def _first_text(node: ET.Element, tags: list[str]) -> str | None:
+def _first_text(node: ET.Element, tags: List[str]) -> Optional[str]:
     for tag in tags:
         child = node.find(tag)
         if child is not None and child.text:
