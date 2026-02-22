@@ -72,6 +72,8 @@
 - 2026-02-22 20:36 / Codex：完成 M4-2（评分接入），`src/main.py` 改为从 `content_pool` 拉候选并调用 `rank_items()` 选 Top1；新增 `source_history` 记录用于多样性分量。
 - 2026-02-22 20:39 / Codex：完成 M4-3（交互回归验证），`/brush -> like -> skip -> save -> read` 命令链路通过；候选结果可按评分切换不同来源。
 - 2026-02-22 20:39 / Codex：修复回归：`run_brush()` 已改为复用 `handle_command()`，消除 `_build_recommended_item()` 参数不匹配问题。
+- 2026-02-22 20:41 / Codex：M4 当前代码已推送 GitHub `main`，提交 `cdd48bf`。
+- 2026-02-22 20:41 / Codex：已同步 Notion 面板 M4 进展；由于旧状态块已归档，改为新增状态段落与 M4 callout（commit `cdd48bf`）。
 - 2026-02-22 20:06 / Codex：开始推进 M3（交互引擎）；完成 `src/interaction/telegram.py` 扩展，新增统一按钮布局、深度阅读消息与收藏反馈消息构造函数。
 
 ## 测试验收（VPS）
