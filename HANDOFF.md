@@ -7,7 +7,7 @@
 ## 当前状态
 - **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成
 - **进度**: 项目总进度约 86%（M1-M7 完成，剩余 M8 测试发布收尾）
-- **最后更新**: Codex / 2026-02-23 01:06
+- **最后更新**: Codex / 2026-02-23 01:43
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -93,6 +93,7 @@
 - 2026-02-23 01:02 / Codex：完成 M7-3（兼容性与回归），修复冷启动状态引用问题（`current_index` 递进失效）；新增“历史老用户自动跳过冷启动”兼容逻辑，保证已有用户不被重新引导。
 - 2026-02-23 01:04 / Codex：完成 M7-4（验收），本地回归通过：新用户 `/brush -> like -> skip -> like` 会输出“冷启动完成”；完成后 `/brush read|save|refresh` 正常；`python3 -m py_compile` 通过。
 - 2026-02-23 01:06 / Codex：完成 M7-5（配置与文档对齐），`config.yaml` 标记 `m7_cold_start: true`，并更新 `SKILL.md`、`README.md`、`docs/CLAW_MANAGER_TEST_MANUAL.md` 的冷启动说明与测试步骤。
+- 2026-02-23 01:43 / Codex：完成展板同步：通过 Notion API 向项目页追加 M7 完成 callout（commit `1501df0`，含冷启动能力与下一步 M8）。
 
 ## 测试验收（VPS）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
