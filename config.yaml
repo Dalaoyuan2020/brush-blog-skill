@@ -31,17 +31,19 @@ tracking:
   behavior_events_file: data/behavior_events.jsonl
 
 sink:
+  local_notes_file: data/saved_notes.jsonl
   notion:
     enabled: false
     api_key: ""
     database_id: ""
+    timeout: 10
 
 milestones:
   m1_scaffold: true
   m2_fetcher: true
   m3_interaction: true
   m4_recommend: true
-  m5_tracker: false
-  m6_sink: false
+  m5_tracker: true
+  m6_sink: true
   m7_cold_start: false
   m8_release: false

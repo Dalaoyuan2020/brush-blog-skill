@@ -12,11 +12,11 @@ metadata: {"clawdbot":{"emoji":"🦞"},"openclaw":{"emoji":"📰","homepage":"ht
 ## 命令
 
 - `/brush` - 开始刷博客
-- `/brush like` - 标记感兴趣（预留）
-- `/brush skip` - 划走（预留）
-- `/brush read` - 深度阅读（预留）
-- `/brush save` - 收藏到知识库（预留）
-- `/brush refresh` - 换一批（预留）
+- `/brush like` - 标记感兴趣并推荐下一条
+- `/brush skip` - 划走并推荐下一条
+- `/brush read` - 展开当前文章深度阅读
+- `/brush save` - 收藏并沉淀到知识库（本地 JSONL，可选 Notion）
+- `/brush refresh` - 换一批推荐
 
 ## 执行流程（当前已实现）
 
@@ -32,6 +32,7 @@ metadata: {"clawdbot":{"emoji":"🦞"},"openclaw":{"emoji":"📰","homepage":"ht
 - 包含按钮提示：
   `[👍 感兴趣] [👎 划走] [📖 深度阅读] [💾 收藏] [🔄 换一批]`
 - RSS 抓取成功时包含 `原文：<url>`
+- `/brush save` 成功后包含沉淀结果（本地或 Notion）
 
 ## 数据优先级
 

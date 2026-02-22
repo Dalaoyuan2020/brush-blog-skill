@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → 🔄 M5 行为收集进行中
-- **进度**: M5 里程碑 40%（阶段内） | 项目总进度约 59%（按 PLAN 11 天权重估算）
-- **最后更新**: Codex / 2026-02-22 23:57
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成
+- **进度**: 项目总进度约 72%（按 PLAN 里程碑完成度估算，M7/M8 待做）
+- **最后更新**: Codex / 2026-02-23 00:33
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -81,6 +81,12 @@
 - 2026-02-22 23:55 / Codex：完成 M5-1（行为日志模块），扩展 `src/tracker/behavior.py`：支持事件结构、JSONL 落盘、最近事件读取。
 - 2026-02-22 23:56 / Codex：完成 M5-2（主流程接入），`src/main.py` 在 `view/like/skip/read/save/refresh` 全链路写行为事件；失败不影响命令主流程。
 - 2026-02-22 23:57 / Codex：M5 本地验证通过：执行 `/brush` 相关命令后行为日志产生 7 条事件（view/like/read/save/refresh 等）；验证后已清理运行时样本数据。
+- 2026-02-23 00:23 / Codex：根据 claw 管家复测结论（`d10cce2`）对齐里程碑状态，`config.yaml` 标记 `m5_tracker: true`，M5 判定完成。
+- 2026-02-23 00:26 / Codex：完成 M6-1（知识沉淀模块），重写 `src/sink/notion.py`：新增结构化笔记生成、JSONL 本地落盘、可选 Notion API 写入与失败回退。
+- 2026-02-23 00:28 / Codex：完成 M6-2（主流程接入），`/brush save` 现已调用沉淀器；返回“本地沉淀/Notion沉淀”反馈，并将 `sink_status/sink_stores` 写入行为日志 metadata。
+- 2026-02-23 00:30 / Codex：完成 M6-3（本地验收），`python3 -m py_compile` 与 `/brush -> like -> read -> save -> refresh` 回归通过；`data/saved_notes.jsonl` 已产出结构化笔记，`behavior_events.jsonl` 记录 `save` 的沉淀元数据。
+- 2026-02-23 00:31 / Codex：完成 M6-4（文档对齐），更新 `SKILL.md` 命令说明（去除“预留”标记）与 `docs/CLAW_MANAGER_TEST_MANUAL.md` 全链路测试项（新增 save 沉淀与行为日志校验）。
+- 2026-02-23 00:33 / Codex：完成 M6-5（稳定性补丁），为 `/brush save` 沉淀流程增加异常兜底；即使本地/Notion 写入失败，也不会影响“收藏成功”主流程。
 
 ## 测试验收（VPS）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
@@ -117,3 +123,4 @@
 - 非阻塞：本机无 `python` 命令（仅有 `python3`），校验脚本已改用 `python3` 执行。
 - 非阻塞：`t.co` 为短链，已落地为可追溯来源 `https://gist.github.com/emschwartz/e6d2bf860ccc367fe37ff953ba6de66b`。
 - 已解除：Notion API 凭据已由羊爸爸提供，任务面板可访问。
+- 非阻塞：不同 Notion Database 的字段名可能与默认映射（`Title/Source/Summary/Tags/Saved At/Rating`）不一致；若出现 400 错误，需在下一步补充字段映射配置。

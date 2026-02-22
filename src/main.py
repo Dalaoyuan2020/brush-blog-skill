@@ -5,6 +5,7 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -21,6 +22,7 @@ from interaction.telegram import (
     build_saved_message,
 )
 from recommend.scorer import rank_items
+from sink.notion import build_structured_note, save_note
 from tracker.behavior import log_behavior_event
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -28,6 +30,7 @@ FEEDS_FILE = ROOT_DIR / "data" / "feeds.json"
 CONTENT_DB = ROOT_DIR / "data" / "content.db"
 PROFILES_DIR = ROOT_DIR / "data" / "profiles"
 BEHAVIOR_EVENTS_FILE = ROOT_DIR / "data" / "behavior_events.jsonl"
+SAVED_NOTES_FILE = ROOT_DIR / "data" / "saved_notes.jsonl"
 READ_HISTORY_LIMIT = 100
 SAVED_ITEMS_LIMIT = 200
 SOURCE_HISTORY_LIMIT = 50
@@ -275,6 +278,54 @@ def _safe_log_event(
         return
 
 
+def _is_true(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return False
+
+
+def _resolve_notion_config(context: Dict[str, Any]) -> Dict[str, Any]:
+    sink_context = context.get("sink", {}) if isinstance(context.get("sink", {}), dict) else {}
+    notion_context = sink_context.get("notion", {}) if isinstance(sink_context.get("notion", {}), dict) else {}
+
+    enabled = notion_context.get("enabled", os.getenv("BRUSH_NOTION_ENABLED", "false"))
+    api_key = notion_context.get("api_key", os.getenv("BRUSH_NOTION_API_KEY", ""))
+    database_id = notion_context.get("database_id", os.getenv("BRUSH_NOTION_DATABASE_ID", ""))
+    timeout_raw = notion_context.get("timeout", os.getenv("BRUSH_NOTION_TIMEOUT", "10"))
+    try:
+        timeout = int(timeout_raw)
+    except Exception:
+        timeout = 10
+
+    return {
+        "enabled": _is_true(enabled),
+        "api_key": str(api_key or "").strip(),
+        "database_id": str(database_id or "").strip(),
+        "timeout": max(3, timeout),
+    }
+
+
+def _save_knowledge_note(user_id: str, item: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    note = build_structured_note(item=item, user_id=user_id)
+    notion_config = _resolve_notion_config(context)
+    return save_note(note=note, notion_config=notion_config, local_path=SAVED_NOTES_FILE)
+
+
+def _build_save_feedback(sink_result: Dict[str, Any]) -> str:
+    status = sink_result.get("status", "")
+    if status == "saved_notion":
+        return "🧠 已沉淀到 Notion（本地已备份）"
+    if status == "saved_local_with_notion_error":
+        return "🗂️ 已沉淀到本地知识库（Notion 暂不可用）"
+    if status == "save_sink_error":
+        return "⚠️ 收藏已成功，但知识沉淀失败（稍后可重试）"
+    return "🗂️ 已沉淀到本地知识库"
+
+
 def handle_command(command: str, args: List[str], user_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
     """
     处理用户命令
@@ -342,8 +393,21 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
             delta=5,
         )
         _save_profile(user_id, profile)
-        _safe_log_event(user_id, "save", last_item)
-        return {"message": build_saved_message(last_item), "buttons": build_brush_buttons()}
+        try:
+            sink_result = _save_knowledge_note(user_id, last_item, context)
+        except Exception as exc:
+            sink_result = {"status": "save_sink_error", "stores": [], "error": str(exc)}
+        _safe_log_event(
+            user_id,
+            "save",
+            last_item,
+            metadata={
+                "sink_status": sink_result.get("status", ""),
+                "sink_stores": sink_result.get("stores", []),
+            },
+        )
+        save_message = build_saved_message(last_item) + "\n" + _build_save_feedback(sink_result)
+        return {"message": save_message, "buttons": build_brush_buttons()}
     
     elif command == "/brush refresh":
         feeds = load_feeds(FEEDS_FILE)

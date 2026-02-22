@@ -1,7 +1,11 @@
 # claw 管家功能测试手册（刷博客 Skill / VPS 版）
 
 ## 1. 测试目标
-验证 `/brush` 命令在当前版本可用，并且优先采用用户指定 RSS 来源（`https://t.co/dwAiIjlXet` 对应 Gist OPML）中的文章。
+验证刷博客 Skill 的核心链路可用：
+- `/brush` 拉取推荐卡片
+- `like/skip/read/save/refresh` 交互命令正常
+- `save` 触发知识沉淀（本地 JSONL，Notion 可选）
+- 行为事件落盘（`behavior_events.jsonl`）
 
 ## 2. 测试前准备
 1. 在 VPS 获取最新版代码：
@@ -17,18 +21,30 @@
    ```
 3. 网络可访问外网 RSS 站点。
 
-## 3. Skill 模式最小测试步骤（必须执行）
+## 3. Skill 模式测试步骤（必须执行）
 1. 执行：
    ```bash
    python3 src/main.py /brush
+   python3 src/main.py /brush like
+   python3 src/main.py /brush read
+   python3 src/main.py /brush save
+   python3 src/main.py /brush refresh
    ```
 2. 预期输出包含：
    - `📰 博客卡片`
    - `按钮：[👍 感兴趣] ...`
+   - `/brush save` 返回 `✅ 已收藏` 且包含 `已沉淀到...`
 3. 优先源验证：
    - 正常网络下，输出应带 `原文：` 链接（真实文章）
    - `来源` 优先来自 `priority_hn_popular_2025`（首条默认是 `simonwillison.net`）
-4. 回退验证（可选）：
+4. 行为/沉淀文件验证：
+   ```bash
+   tail -n 5 data/behavior_events.jsonl
+   tail -n 3 data/saved_notes.jsonl
+   ```
+   - `behavior_events.jsonl` 包含 `view/like/read/save/refresh` 等事件
+   - `saved_notes.jsonl` 至少新增 1 条结构化笔记（title/summary/tags/source_url）
+5. 回退验证（可选）：
    - 断网或故意改错首条 RSS URL 后重跑
    - 预期仍能输出卡片（假数据回退），命令不崩溃
 
@@ -50,8 +66,10 @@
 1) 命令是否成功退出（exit code）
 2) 是否打印博客卡片与按钮文案
 3) 是否打印原文链接（原文：...）
-4) 来源是否来自 priority_hn_popular_2025 首条源
-5) 若失败，请给出失败步骤、报错原文、定位建议
+4) `/brush save` 是否输出收藏+沉淀文案
+5) `behavior_events.jsonl` 是否记录 save 事件
+6) `saved_notes.jsonl` 是否新增结构化笔记
+7) 若失败，请给出失败步骤、报错原文、定位建议
 
 报告格式：
 - 结果：PASS/FAIL
