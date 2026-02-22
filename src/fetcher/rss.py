@@ -1,10 +1,10 @@
-
 import json
-import re
 import urllib.request
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Union, Optional, Dict, List
+from typing import Any, Dict, List, Optional, Union
+
+from fetcher.cleaner import clean_text, summarize_text
 
 
 def load_feeds(feeds_path: Union[str, Path]) -> Dict[str, List[Dict[str, Any]]]:
@@ -38,17 +38,70 @@ def fetch_latest_article(feed_url: str, timeout: int = 10) -> Optional[Dict[str,
 
     title = _first_text(item, ["title", "{*}title"]) or "Untitled"
     link = _extract_link(item)
-    summary = _first_text(
+    raw_summary = _first_text(
         item,
         ["description", "summary", "{*}summary", "content", "{*}content"],
     )
-    summary = _strip_html(summary or "")
+    summary = summarize_text(raw_summary or "")
 
     return {
-        "title": title,
+        "title": clean_text(title) or "Untitled",
         "link": link,
-        "summary": summary[:200] if summary else "暂无摘要",
+        "summary": summary,
     }
+
+
+def collect_latest_articles(
+    feeds: Dict[str, List[Dict[str, Any]]],
+    priority_category: str = "priority_hn_popular_2025",
+    per_category_limit: int = 1,
+    max_items: int = 10,
+    timeout: int = 10,
+) -> List[Dict[str, Any]]:
+    """
+    Collect latest articles across feed categories.
+
+    Priority category is processed first, then remaining categories by config order.
+    """
+    articles = []
+    categories = _ordered_categories(feeds, priority_category)
+
+    for category in categories:
+        sources = feeds.get(category, [])
+        collected_in_category = 0
+
+        for source in sources:
+            if collected_in_category >= per_category_limit:
+                break
+            if len(articles) >= max_items:
+                return articles
+
+            feed_url = source.get("url", "")
+            if not feed_url:
+                continue
+
+            try:
+                article = fetch_latest_article(feed_url, timeout=timeout)
+            except Exception:
+                article = None
+
+            if not article:
+                continue
+
+            article_item = {
+                "title": article.get("title", "Untitled"),
+                "summary": article.get("summary", "暂无摘要"),
+                "link": article.get("link", ""),
+                "category": category,
+                "source": source.get("site", source.get("name", "unknown")),
+                "feed_name": source.get("name", ""),
+                "feed_url": feed_url,
+                "tags": category.split("_"),
+            }
+            articles.append(article_item)
+            collected_in_category += 1
+
+    return articles
 
 
 def _first_text(node: ET.Element, tags: List[str]) -> Optional[str]:
@@ -74,7 +127,9 @@ def _extract_link(node: ET.Element) -> str:
     return ""
 
 
-def _strip_html(text: str) -> str:
-    cleaned = re.sub(r"<[^>]+>", " ", text)
-    cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return cleaned
+def _ordered_categories(feeds: Dict[str, List[Dict[str, Any]]], priority_category: str) -> List[str]:
+    categories = list(feeds.keys())
+    if priority_category in categories:
+        categories.remove(priority_category)
+        return [priority_category] + categories
+    return categories

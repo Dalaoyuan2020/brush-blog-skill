@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成（VPS 复测通过） → M2 待启动
-- **进度**: 100% — M1 全部验收完成，Skill 入口与命令链路可用
-- **最后更新**: Codex / 2026-02-22 18:46
+- **阶段**: ✅ M1 完成（VPS 复测通过） → 🔄 M2 内容采集进行中
+- **进度**: 65%（整体）— M2 核心链路已打通（抓取+清洗+摘要+接入 /brush）
+- **最后更新**: Codex / 2026-02-22 19:37
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -49,6 +49,11 @@
 - 2026-02-22 12:35 / Codex：回归验证通过，`python3 src/main.py /brush` 输出正常。
 - 2026-02-22 18:10 / Codex：解决远端并行变更导致的 `SKILL.md` rebase 冲突（add/add），已合并为统一 skill 描述并推送 `main`，提交 `57f246f`。
 - 2026-02-22 18:46 / Codex：接收 claw 管家 VPS 复测结果，确认 `bf83d92` 版本在 `/home/admin/clawd/github/brush-blog-skill` 执行 `python3 src/main.py /brush` 通过（exit code 0，卡片与按钮输出正常）。
+- 2026-02-22 18:53 / Codex：按激活指令通过 Notion API 读取页面 `Opus-30bd38a850fc805c98edf1de6e88f31c`，确认“⚠️ 协作踩坑记录”与“M2 内容采集（RSS 解析/摘要生成/内容清洗）”任务要求。
+- 2026-02-22 18:55 / Codex：完成 M2-1（内容清洗/摘要），增强 `src/fetcher/cleaner.py`：支持 HTML 标签清洗、实体解码、2-3 句摘要生成（长度截断）。
+- 2026-02-22 18:57 / Codex：完成 M2-2（RSS 解析），增强 `src/fetcher/rss.py`：新增 `collect_latest_articles()`，按 `priority_hn_popular_2025` 优先批量抓取并输出标准化文章结构。
+- 2026-02-22 19:37 / Codex：完成 M2-3（主链路接入），`src/main.py` 改为 `/brush` 统一走 `_build_recommended_item()` 使用批量抓取结果，抓取失败自动回退 mock；`handle_command` 与 CLI 均支持输出 `原文` 链接。
+- 2026-02-22 19:37 / Codex：本地验收通过：`python3 src/main.py /brush` 与 `PYTHONPATH=src python3 -c \"from main import handle_command ...\"` 均返回卡片、按钮、原文链接。
 
 ## 测试验收（VPS）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
@@ -64,3 +69,4 @@
 ## 问题区
 - 非阻塞：本机无 `python` 命令（仅有 `python3`），校验脚本已改用 `python3` 执行。
 - 非阻塞：`t.co` 为短链，已落地为可追溯来源 `https://gist.github.com/emschwartz/e6d2bf860ccc367fe37ff953ba6de66b`。
+- 已解除：Notion API 凭据已由羊爸爸提供，任务面板可访问。

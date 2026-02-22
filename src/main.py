@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fetcher.rss import fetch_latest_article, load_feeds
+from fetcher.rss import collect_latest_articles, load_feeds
 from interaction.telegram import build_brush_card
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -28,6 +28,39 @@ def _build_mock_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
         "source": first_feed.get("site", "example.com"),
         "link": "",
     }
+
+
+def _build_recommended_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+    """
+    Build one recommended card item from live RSS data with mock fallback.
+    """
+    card_item = _build_mock_item(feeds)
+
+    try:
+        articles = collect_latest_articles(
+            feeds,
+            priority_category="priority_hn_popular_2025",
+            per_category_limit=1,
+            max_items=1,
+            timeout=10,
+        )
+    except Exception:
+        articles = []
+
+    if not articles:
+        return card_item
+
+    top_article = articles[0]
+    card_item.update(
+        {
+            "title": top_article.get("title", card_item["title"]),
+            "summary": top_article.get("summary", card_item["summary"]),
+            "tags": top_article.get("tags", card_item["tags"]),
+            "source": top_article.get("source", card_item["source"]),
+            "link": top_article.get("link", ""),
+        }
+    )
+    return card_item
 
 
 def _load_profile(user_id: str) -> Optional[Dict[str, Any]]:
@@ -66,31 +99,10 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
     # 主命令：开始刷博客
     if command == "/brush":
         feeds = load_feeds(FEEDS_FILE)
-        profile = _load_profile(user_id)
-        
-        # M1 阶段：使用 mock 数据
-        card_item = _build_mock_item(feeds)
-        
-        # 检查是否有真实 RSS 内容
-        first_category = next(iter(feeds), "tech_programming")
-        first_feed = feeds.get(first_category, [{}])[0]
-        feed_url = first_feed.get("url", "")
-        
-        if feed_url:
-            try:
-                latest_article = fetch_latest_article(feed_url)
-                if latest_article:
-                    card_item = {
-                        "title": latest_article["title"],
-                        "summary": latest_article["summary"] or "暂无摘要",
-                        "tags": first_category.split("_"),
-                        "source": first_feed.get("site", "example.com"),
-                        "link": latest_article["link"],
-                    }
-            except Exception:
-                pass  # 使用 mock 数据
-        
+        card_item = _build_recommended_item(feeds)
         message = build_brush_card(card_item)
+        if card_item.get("link"):
+            message += "\n原文：{0}".format(card_item["link"])
         
         return {
             "message": message,
@@ -139,24 +151,7 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
 def run_brush() -> int:
     """Handle /brush command with priority RSS source and fallback."""
     feeds = load_feeds(FEEDS_FILE)
-    first_category = next(iter(feeds), "tech_programming")
-    first_feed = feeds.get(first_category, [{}])[0]
-    card_item = _build_mock_item(feeds)
-
-    feed_url = first_feed.get("url", "")
-    if feed_url:
-        try:
-            latest_article = fetch_latest_article(feed_url)
-        except Exception:
-            latest_article = None
-        if latest_article:
-            card_item = {
-                "title": latest_article["title"],
-                "summary": latest_article["summary"] or "暂无摘要",
-                "tags": first_category.split("_"),
-                "source": first_feed.get("site", "example.com"),
-                "link": latest_article["link"],
-            }
+    card_item = _build_recommended_item(feeds)
 
     print(build_brush_card(card_item))
     if card_item.get("link"):
