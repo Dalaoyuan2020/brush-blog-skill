@@ -14,13 +14,19 @@ from fetcher.rss import (
     pick_article_from_pool,
     refresh_content_pool,
 )
-from interaction.telegram import build_brush_card
+from interaction.telegram import (
+    build_brush_buttons,
+    build_brush_card,
+    build_deep_read_message,
+    build_saved_message,
+)
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FEEDS_FILE = ROOT_DIR / "data" / "feeds.json"
 CONTENT_DB = ROOT_DIR / "data" / "content.db"
 PROFILES_DIR = ROOT_DIR / "data" / "profiles"
 READ_HISTORY_LIMIT = 100
+SAVED_ITEMS_LIMIT = 200
 
 
 def _build_mock_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
@@ -125,6 +131,15 @@ def _save_profile(user_id: str, profile: Dict[str, Any]) -> None:
         json.dump(profile, f, ensure_ascii=False, indent=2)
 
 
+def _default_profile() -> Dict[str, Any]:
+    return {
+        "interest_tags": {},
+        "read_history": [],
+        "saved_items": [],
+        "last_item": {},
+    }
+
+
 def _record_read_history(profile: Dict[str, Any], item_key: str) -> Dict[str, Any]:
     """Append one item key into read history with cap and de-duplication."""
     history = profile.get("read_history", [])
@@ -138,6 +153,76 @@ def _record_read_history(profile: Dict[str, Any], item_key: str) -> Dict[str, An
 
     profile["read_history"] = history
     return profile
+
+
+def _record_saved_item(profile: Dict[str, Any], item: Dict[str, Any]) -> Dict[str, Any]:
+    saved_items = profile.get("saved_items", [])
+    if not isinstance(saved_items, list):
+        saved_items = []
+
+    item_key = item.get("item_key", "")
+    normalized_item = {
+        "item_key": item_key,
+        "title": item.get("title", "Untitled"),
+        "source": item.get("source", "unknown"),
+        "link": item.get("link", ""),
+        "summary": item.get("summary", "暂无摘要"),
+    }
+
+    if item_key:
+        saved_items = [entry for entry in saved_items if entry.get("item_key", "") != item_key]
+    saved_items.append(normalized_item)
+    saved_items = saved_items[-SAVED_ITEMS_LIMIT:]
+    profile["saved_items"] = saved_items
+    return profile
+
+
+def _update_interest_tags(profile: Dict[str, Any], tags: List[str], delta: int) -> Dict[str, Any]:
+    interest = profile.get("interest_tags", {})
+    if not isinstance(interest, dict):
+        interest = {}
+
+    for tag in tags:
+        if not tag:
+            continue
+        old_value = float(interest.get(tag, 0.0))
+        interest[tag] = round(old_value + float(delta), 2)
+
+    profile["interest_tags"] = interest
+    return profile
+
+
+def _build_card_message(item: Dict[str, Any]) -> str:
+    message = build_brush_card(item)
+    if item.get("link"):
+        message += "\n原文：{0}".format(item["link"])
+    return message
+
+
+def _build_brush_response(item: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "message": _build_card_message(item),
+        "buttons": build_brush_buttons(),
+    }
+
+
+def _next_item_response(user_id: str, profile: Dict[str, Any], feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+    history = profile.get("read_history", [])
+    if not isinstance(history, list):
+        history = []
+
+    card_item = _build_recommended_item(feeds, history_item_keys=history)
+    profile["last_item"] = card_item
+    profile = _record_read_history(profile, card_item.get("item_key", ""))
+    _save_profile(user_id, profile)
+
+    return _build_brush_response(card_item)
+
+
+def _merge_command_and_args(command: str, args: List[str]) -> str:
+    if args and command.startswith("/"):
+        return "{0} {1}".format(command, " ".join(args))
+    return command
 
 
 def handle_command(command: str, args: List[str], user_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -156,58 +241,59 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
             "buttons": [[{"text": str, "callback_data": str}]],  # 按钮（可选）
         }
     """
+    command = _merge_command_and_args(command, args)
+    profile = _load_profile(user_id) or _default_profile()
+
     # 主命令：开始刷博客
     if command == "/brush":
         feeds = load_feeds(FEEDS_FILE)
-        profile = _load_profile(user_id) or {"interest_tags": {}, "read_history": []}
-        history = profile.get("read_history", []) if isinstance(profile, dict) else []
-
-        card_item = _build_recommended_item(feeds, history_item_keys=history)
-        message = build_brush_card(card_item)
-        if card_item.get("link"):
-            message += "\n原文：{0}".format(card_item["link"])
-
-        profile = _record_read_history(profile, card_item.get("item_key", ""))
-        _save_profile(user_id, profile)
-        
-        return {
-            "message": message,
-            "buttons": [
-                [
-                    {"text": "👍 感兴趣", "callback_data": "/brush like"},
-                    {"text": "👎 划走", "callback_data": "/brush skip"}
-                ],
-                [
-                    {"text": "📖 深度阅读", "callback_data": "/brush read"},
-                    {"text": "💾 收藏", "callback_data": "/brush save"}
-                ],
-                [
-                    {"text": "🔄 换一批", "callback_data": "/brush refresh"}
-                ]
-            ]
-        }
+        return _next_item_response(user_id, profile, feeds)
     
     # 按钮回调处理
     elif command == "/brush like":
-        # 记录正反馈
-        profile = _load_profile(user_id) or {"interest_tags": {}, "read_history": []}
-        # TODO: 更新兴趣分数
+        last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
+        tags = last_item.get("tags", []) if isinstance(last_item.get("tags", []), list) else []
+        profile = _update_interest_tags(profile, tags, delta=2)
         _save_profile(user_id, profile)
-        return {"message": "已记录，推荐相似内容 👍"}
+        feeds = load_feeds(FEEDS_FILE)
+        response = _next_item_response(user_id, profile, feeds)
+        response["message"] = "✅ 已记录偏好（+2）\n\n" + response["message"]
+        return response
     
     elif command == "/brush skip":
-        # 记录负反馈，跳过
-        return {"message": "已跳过 👎"}
+        last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
+        tags = last_item.get("tags", []) if isinstance(last_item.get("tags", []), list) else []
+        profile = _update_interest_tags(profile, tags, delta=-1)
+        _save_profile(user_id, profile)
+        feeds = load_feeds(FEEDS_FILE)
+        response = _next_item_response(user_id, profile, feeds)
+        response["message"] = "⏭️ 已跳过（-1）\n\n" + response["message"]
+        return response
     
     elif command == "/brush read":
-        return {"message": "📖 深度阅读功能开发中..."}
+        last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
+        if not last_item:
+            return {"message": "还没有可展开的文章，先试试 /brush", "buttons": build_brush_buttons()}
+        return {"message": build_deep_read_message(last_item), "buttons": build_brush_buttons()}
     
     elif command == "/brush save":
-        return {"message": "💾 收藏功能开发中..."}
+        last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
+        if not last_item:
+            return {"message": "还没有可收藏的文章，先试试 /brush", "buttons": build_brush_buttons()}
+        profile = _record_saved_item(profile, last_item)
+        profile = _update_interest_tags(
+            profile,
+            last_item.get("tags", []) if isinstance(last_item.get("tags", []), list) else [],
+            delta=5,
+        )
+        _save_profile(user_id, profile)
+        return {"message": build_saved_message(last_item), "buttons": build_brush_buttons()}
     
     elif command == "/brush refresh":
-        # 换一批：重新推荐
-        return handle_command("/brush", [], user_id, context)
+        feeds = load_feeds(FEEDS_FILE)
+        response = _next_item_response(user_id, profile, feeds)
+        response["message"] = "🔄 已换一批\n\n" + response["message"]
+        return response
     
     else:
         return {"message": "未知命令，试试 /brush"}
@@ -229,14 +315,22 @@ def run_brush() -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Brush blog skill command runner")
     parser.add_argument("command", nargs="?", default="/brush", help="skill command, e.g. /brush")
+    parser.add_argument("args", nargs="*", help="command args")
     args = parser.parse_args()
 
-    if args.command == "/brush":
+    if args.command == "/brush" and not args.args:
         return run_brush()
 
-    print(f"Unknown command: {args.command}")
-    print("Try: /brush")
-    return 1
+    result = handle_command(args.command, args.args, "cli-user", {})
+    print(result.get("message", ""))
+    buttons = result.get("buttons", [])
+    if buttons:
+        button_texts = []
+        for row in buttons:
+            row_labels = " ".join("[{0}]".format(btn.get("text", "")) for btn in row)
+            button_texts.append(row_labels)
+        print("按钮：" + " | ".join(button_texts))
+    return 0
 
 
 if __name__ == "__main__":

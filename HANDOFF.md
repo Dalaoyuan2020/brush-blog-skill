@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成（VPS 复测通过） → ✅ M2 开发完成（待 VPS 复测确认）
-- **进度**: M2 里程碑 100%（阶段内） | 项目总进度约 18%（按 PLAN 11 天权重估算）
-- **最后更新**: Codex / 2026-02-22 20:00
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成（交互引擎）
+- **进度**: M3 里程碑 100%（阶段内） | 项目总进度约 36%（按 PLAN 11 天权重估算）
+- **最后更新**: Codex / 2026-02-22 20:08
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -64,6 +64,10 @@
 - 2026-02-22 19:57 / Codex：完成 M2-6（验收与配置），本地验证通过（CLI/handle_command/SQLite 入库/profile 历史），并将 `config.yaml` 里程碑 `m2_fetcher` 设置为 `true`。
 - 2026-02-22 20:00 / Codex：已推送 M2 完成代码到 GitHub `main`，提交 `30326f2`。
 - 2026-02-22 20:00 / Codex：已同步 Notion 页面状态为 `M2 开发完成（待VPS验收）`，并追加 commit `30326f2` 的 M2 完成说明与验收请求。
+- 2026-02-22 20:06 / Codex：开始推进 M3（交互引擎）；完成 `src/interaction/telegram.py` 扩展，新增统一按钮布局、深度阅读消息与收藏反馈消息构造函数。
+- 2026-02-22 20:08 / Codex：完成 `src/main.py` 交互主流程：`/brush like|skip|read|save|refresh` 全部落地；新增 `last_item`、`saved_items`、`interest_tags` 更新逻辑。
+- 2026-02-22 20:08 / Codex：M3 本地验收通过：CLI 下 `/brush read` 可展开详情，`/brush save` 可收藏并回写 profile，按钮链路完整。
+- 2026-02-22 20:06 / Codex：开始推进 M3（交互引擎）；完成 `src/interaction/telegram.py` 扩展，新增统一按钮布局、深度阅读消息与收藏反馈消息构造函数。
 
 ## 测试验收（VPS）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
