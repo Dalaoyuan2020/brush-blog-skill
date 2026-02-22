@@ -37,7 +37,7 @@ sink:
 
 milestones:
   m1_scaffold: true
-  m2_fetcher: false
+  m2_fetcher: true
   m3_interaction: false
   m4_recommend: false
   m5_tracker: false

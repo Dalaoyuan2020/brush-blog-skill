@@ -8,12 +8,19 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fetcher.rss import collect_latest_articles, load_feeds
+from fetcher.rss import (
+    collect_latest_articles,
+    load_feeds,
+    pick_article_from_pool,
+    refresh_content_pool,
+)
 from interaction.telegram import build_brush_card
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FEEDS_FILE = ROOT_DIR / "data" / "feeds.json"
+CONTENT_DB = ROOT_DIR / "data" / "content.db"
 PROFILES_DIR = ROOT_DIR / "data" / "profiles"
+READ_HISTORY_LIMIT = 100
 
 
 def _build_mock_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
@@ -30,11 +37,48 @@ def _build_mock_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
     }
 
 
-def _build_recommended_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+def _build_recommended_item(
+    feeds: Dict[str, List[Dict[str, Any]]], history_item_keys: Optional[List[str]] = None
+) -> Dict[str, Any]:
     """
-    Build one recommended card item from live RSS data with mock fallback.
+    Build one recommended card item from content pool with live fallback.
     """
     card_item = _build_mock_item(feeds)
+    exclude_keys = history_item_keys or []
+
+    try:
+        refresh_content_pool(
+            feeds,
+            db_path=CONTENT_DB,
+            priority_category="priority_hn_popular_2025",
+            per_category_limit=1,
+            max_items=12,
+            timeout=10,
+        )
+    except Exception:
+        pass
+
+    try:
+        pooled_article = pick_article_from_pool(
+            CONTENT_DB,
+            priority_category="priority_hn_popular_2025",
+            exclude_item_keys=exclude_keys,
+        )
+    except Exception:
+        pooled_article = None
+
+    if pooled_article:
+        card_item.update(
+            {
+                "title": pooled_article.get("title", card_item["title"]),
+                "summary": pooled_article.get("summary", card_item["summary"]),
+                "tags": pooled_article.get("tags", card_item["tags"]),
+                "source": pooled_article.get("source", card_item["source"]),
+                "link": pooled_article.get("link", ""),
+                "item_key": pooled_article.get("item_key", ""),
+            }
+        )
+        return card_item
 
     try:
         articles = collect_latest_articles(
@@ -58,6 +102,7 @@ def _build_recommended_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str,
             "tags": top_article.get("tags", card_item["tags"]),
             "source": top_article.get("source", card_item["source"]),
             "link": top_article.get("link", ""),
+            "item_key": "",
         }
     )
     return card_item
@@ -80,6 +125,21 @@ def _save_profile(user_id: str, profile: Dict[str, Any]) -> None:
         json.dump(profile, f, ensure_ascii=False, indent=2)
 
 
+def _record_read_history(profile: Dict[str, Any], item_key: str) -> Dict[str, Any]:
+    """Append one item key into read history with cap and de-duplication."""
+    history = profile.get("read_history", [])
+    if not isinstance(history, list):
+        history = []
+
+    if item_key:
+        history = [value for value in history if value != item_key]
+        history.append(item_key)
+        history = history[-READ_HISTORY_LIMIT:]
+
+    profile["read_history"] = history
+    return profile
+
+
 def handle_command(command: str, args: List[str], user_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
     """
     处理用户命令
@@ -99,10 +159,16 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
     # 主命令：开始刷博客
     if command == "/brush":
         feeds = load_feeds(FEEDS_FILE)
-        card_item = _build_recommended_item(feeds)
+        profile = _load_profile(user_id) or {"interest_tags": {}, "read_history": []}
+        history = profile.get("read_history", []) if isinstance(profile, dict) else []
+
+        card_item = _build_recommended_item(feeds, history_item_keys=history)
         message = build_brush_card(card_item)
         if card_item.get("link"):
             message += "\n原文：{0}".format(card_item["link"])
+
+        profile = _record_read_history(profile, card_item.get("item_key", ""))
+        _save_profile(user_id, profile)
         
         return {
             "message": message,

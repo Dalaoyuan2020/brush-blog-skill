@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成（VPS 复测通过） → 🔄 M2 内容采集进行中
-- **进度**: M2 里程碑 70%（阶段内） | 项目总进度约 16%（按 PLAN 11 天权重估算）
-- **最后更新**: Codex / 2026-02-22 19:48
+- **阶段**: ✅ M1 完成（VPS 复测通过） → ✅ M2 开发完成（待 VPS 复测确认）
+- **进度**: M2 里程碑 100%（阶段内） | 项目总进度约 18%（按 PLAN 11 天权重估算）
+- **最后更新**: Codex / 2026-02-22 19:57
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -59,6 +59,9 @@
 - 2026-02-22 19:45 / Codex：已同步 Notion 面板（页面 `刷博客 Skill - Agent Team 首个协作项目`）：更新“项目状态”为 `M2 进行中 | 进度 70%`，并追加 M2 复测通过 callout 与下一步行动。
 - 2026-02-22 19:45 / Codex：新增 `docs/NOTION_AI_UPDATE_PLAYBOOK.md`，提供固定沟通模板（阶段/进度/提交号/测试命令/结果/下一步）以提升 Notion AI 看板更新质量。
 - 2026-02-22 19:48 / Codex：修正进度口径：`70%` 改为 `M2 里程碑进度 70%`，并补充 `项目总进度约 16%`（按 PLAN 11 天工期权重计算）。
+- 2026-02-22 19:52 / Codex：完成 M2-4（内容池存储层），在 `src/fetcher/rss.py` 增加 SQLite 能力：`init_content_db`、`upsert_articles`、`refresh_content_pool`、`pick_article_from_pool`，实现 RSS 抓取结果入库与按优先分类取文。
+- 2026-02-22 19:57 / Codex：完成 M2-5（主流程闭环），`src/main.py` 接入 `content.db`：`/brush` 先刷新内容池再取推荐，失败时回退实时抓取与 mock；新增 `read_history` 去重策略避免重复文章。
+- 2026-02-22 19:57 / Codex：完成 M2-6（验收与配置），本地验证通过（CLI/handle_command/SQLite 入库/profile 历史），并将 `config.yaml` 里程碑 `m2_fetcher` 设置为 `true`。
 
 ## 测试验收（VPS）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
@@ -80,6 +83,16 @@
   - 输出真实博客内容（非 M1 mock）
   - 实例文章来源：Jeff Geerling（Frigate + Hailo）
   - 卡片与按钮文案正常
+
+## 测试验收（本地，M2 完成）
+- **执行命令**: `python3 src/main.py /brush`
+- **执行命令**: `PYTHONPATH=src python3 -c \"from main import handle_command ...\"`
+- **数据库检查**: `sqlite3 data/content.db 'SELECT COUNT(*) FROM content_pool;'`
+- **结果**: ✅ PASS
+- **证据摘要**:
+  - `content_pool` 已建表并入库（当前 6 条）
+  - `/brush` 可输出真实文章 + 原文链接 + 按钮
+  - `data/profiles/<user>.json` 已记录 `read_history` item_key
 
 ## 问题区
 - 非阻塞：本机无 `python` 命令（仅有 `python3`），校验脚本已改用 `python3` 执行。
