@@ -61,6 +61,15 @@
    - 冷启动阶段按钮为“这个领域感兴趣/下一个领域”
    - 选择满 2 个领域后输出：`✅ 冷启动完成，已进入智能推荐。`
 
+## 3.2 M8 自动化 smoke test（推荐）
+```bash
+python3 scripts/m8_smoke_test.py
+```
+
+预期输出：
+- `M8 smoke test PASS`
+- 输出 checked commands / behavior events / saved notes 统计
+
 ## 4. claw 管家执行指令（可直接复制）
 
 ```text
