@@ -6,8 +6,8 @@
 
 ## 当前状态
 - **阶段**: ✅ M1 完成（VPS 复测通过） → 🔄 M2 内容采集进行中
-- **进度**: 65%（整体）— M2 核心链路已打通（抓取+清洗+摘要+接入 /brush）
-- **最后更新**: Codex / 2026-02-22 19:37
+- **进度**: 70%（整体）— M2 真实内容链路已通过 VPS 复测
+- **最后更新**: Codex / 2026-02-22 19:44
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -55,6 +55,9 @@
 - 2026-02-22 19:37 / Codex：完成 M2-3（主链路接入），`src/main.py` 改为 `/brush` 统一走 `_build_recommended_item()` 使用批量抓取结果，抓取失败自动回退 mock；`handle_command` 与 CLI 均支持输出 `原文` 链接。
 - 2026-02-22 19:37 / Codex：本地验收通过：`python3 src/main.py /brush` 与 `PYTHONPATH=src python3 -c \"from main import handle_command ...\"` 均返回卡片、按钮、原文链接。
 - 2026-02-22 19:40 / Codex：已将 M2 当前进展推送 GitHub `main`，提交 `e451908`，可在 VPS 直接 `git pull` 复测。
+- 2026-02-22 19:44 / Codex：接收 claw 管家复测结果，确认 `6ea0318` 在 VPS 通过；`/brush` 已输出真实博客内容（Jeff Geerling: Frigate + Hailo），M2 推进有效。
+- 2026-02-22 19:45 / Codex：已同步 Notion 面板（页面 `刷博客 Skill - Agent Team 首个协作项目`）：更新“项目状态”为 `M2 进行中 | 进度 70%`，并追加 M2 复测通过 callout 与下一步行动。
+- 2026-02-22 19:45 / Codex：新增 `docs/NOTION_AI_UPDATE_PLAYBOOK.md`，提供固定沟通模板（阶段/进度/提交号/测试命令/结果/下一步）以提升 Notion AI 看板更新质量。
 
 ## 测试验收（VPS）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
@@ -66,6 +69,16 @@
   - 输出博客卡片与按钮文案
   - 来源命中 `priority_hn_popular_2025` 首条（`simonwillison.net`）
   - “原文链接未显示”属于 M1 mock 回退路径，已标记低优先级，M2 真实采集阶段处理
+
+## 测试验收（VPS，M2 进展）
+- **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
+- **测试版本**: `6ea0318`
+- **执行命令**: `python3 src/main.py /brush`
+- **结果**: ✅ PASS
+- **证据摘要**:
+  - 输出真实博客内容（非 M1 mock）
+  - 实例文章来源：Jeff Geerling（Frigate + Hailo）
+  - 卡片与按钮文案正常
 
 ## 问题区
 - 非阻塞：本机无 `python` 命令（仅有 `python3`），校验脚本已改用 `python3` 执行。
