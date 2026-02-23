@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → 🔄 M10-M12 待开发
-- **进度**: v1.0 阶段进度 100%；全路线进度约 75%（9/12 里程碑）
-- **最后更新**: Codex / 2026-02-23 10:19
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → 🔄 M11-M12 待开发
+- **进度**: v1.0 阶段进度 100%；全路线进度约 83%（10/12 里程碑）
+- **最后更新**: Codex / 2026-02-23 10:44
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -17,11 +17,11 @@
 - 推荐算法公式：Interest×0.4 + Knowledge×0.3 + Diversity×0.2 + Popularity×0.1
 
 ## 下阶段目标
-- **任务**: 继续实现 M10-M12（全文深读/摘要质量、按钮可点击、兴趣选择）
+- **任务**: 继续实现 M11-M12（按钮可点击、兴趣选择优化）
 - **由谁来做**: Codex / Claude Code
 - **预期产出**: 可运行的 Skill 代码
 - **预期时间**: 待按 `docs/USER_FEEDBACK_2026-02-23.md` 拆分排期
-- **起点**: 从 M10 全文抓取 + 白话摘要开始
+- **起点**: 从 M11 Telegram 按钮可点击开始
 
 ## 验收标准（M1 骨架搭建）
 - [x] 所有模块文件创建完成（见 PLAN.md 文件结构）
@@ -106,6 +106,19 @@
 - 2026-02-23 10:11 / Codex：完成 M9-3（轻量优化），增加 `feeds.json` mtime 缓存、移除行为日志调试打印，并提供环境变量调优项（刷新间隔/超时/池容量）。
 - 2026-02-23 10:12 / Codex：M9 本地回归通过：`python3 -m py_compile` 与 `scripts/m8_smoke_test.py` 均 PASS；单次 `/brush` CLI 测量 `real 0.12s`（当前环境）。
 - 2026-02-23 10:19 / Codex：完成展板同步：通过 Notion API 追加 M9 完成 callout（commit `4303a15`，含性能优化说明与下一步 M10）。
+- 2026-02-23 10:24 / Codex：完成 M10-1（深读抓取模块），新增 `src/fetcher/reader.py`：支持原文抓取、正文去噪提取、深读摘录生成与“大白话”解释生成。
+- 2026-02-23 10:31 / Codex：完成 M10-2（读命令接入），`/brush read` 改为先抓取原文正文并生成“🧠 大白话讲解 + 📚 正文摘录”；抓取失败自动回退 RSS 摘要，不影响主流程。
+- 2026-02-23 10:42 / Codex：完成 M10-3（回归与配置），`python3 -m py_compile` 与 `scripts/m8_smoke_test.py` 通过；`config.yaml` 标记 `m10_deep_read: true`，`README.md` 与 `docs/USER_FEEDBACK_2026-02-23.md` 完成状态对齐。
+- 2026-02-23 10:45 / Codex：完成 M10-4（验收手册升级），更新 `docs/CLAW_MANAGER_TEST_MANUAL.md`：新增 `/brush read` 的“大白话讲解 + 正文摘录”检查项，供 VPS 复测。
+
+## 测试验收（本地，M10 深度阅读）
+- **执行命令**: `PYTHONPATH=src python3 -c "from main import handle_command ... /brush read"`
+- **执行命令**: `python3 scripts/m8_smoke_test.py`
+- **结果**: ✅ PASS
+- **证据摘要**:
+  - `/brush read` 输出“🧠 大白话讲解”与“📚 正文摘录”
+  - 原文抓取失败时自动回退摘要（命令不报错）
+  - `M8 smoke test PASS`（核心链路无回归）
 
 ## 测试验收（本地，M9 性能）
 - **执行命令**: `/usr/bin/time -p python3 src/main.py /brush`

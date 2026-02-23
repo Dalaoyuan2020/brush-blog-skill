@@ -17,6 +17,12 @@ from fetcher.rss import (
     load_feeds,
     refresh_content_pool,
 )
+from fetcher.reader import (
+    build_deep_read_snippet,
+    build_plain_language_explanation,
+    fetch_full_article_text,
+)
+from fetcher.cleaner import summarize_text
 from interaction.telegram import (
     build_brush_buttons,
     build_brush_card,
@@ -84,6 +90,7 @@ POOL_REFRESH_TIMEOUT_SECONDS = _env_int("BRUSH_POOL_REFRESH_TIMEOUT_SEC", 4)
 POOL_REFRESH_MAX_ITEMS = _env_int("BRUSH_POOL_REFRESH_MAX_ITEMS", 4)
 POOL_REFRESH_PER_CATEGORY_LIMIT = _env_int("BRUSH_POOL_REFRESH_PER_CATEGORY", 1)
 FALLBACK_FETCH_TIMEOUT_SECONDS = _env_int("BRUSH_FALLBACK_FETCH_TIMEOUT_SEC", 4)
+DEEP_READ_FETCH_TIMEOUT_SECONDS = _env_int("BRUSH_DEEP_READ_TIMEOUT_SEC", 6)
 _FEEDS_CACHE: Dict[str, Any] = {"mtime": None, "data": None}
 
 
@@ -665,6 +672,48 @@ def _build_save_feedback(sink_result: Dict[str, Any]) -> str:
     return "🗂️ 已沉淀到本地知识库"
 
 
+def _build_deep_read_payload(item: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Build deep-read payload from full article content with fallback.
+    """
+    title = str(item.get("title", "Untitled"))
+    summary = str(item.get("summary", "暂无摘要"))
+    link = str(item.get("link", "") or "")
+
+    if not link:
+        explain = build_plain_language_explanation(title, summary, summary)
+        return {
+            "explain": explain,
+            "excerpt": summarize_text(summary, max_sentences=3, max_chars=420),
+            "status": "no_link_fallback",
+        }
+
+    try:
+        result = fetch_full_article_text(
+            link,
+            timeout=DEEP_READ_FETCH_TIMEOUT_SECONDS,
+            max_chars=6500,
+        )
+        body_text = result.get("text", "")
+        if body_text:
+            explain = build_plain_language_explanation(title, summary, body_text)
+            excerpt = build_deep_read_snippet(body_text, max_chars=900)
+            return {
+                "explain": explain,
+                "excerpt": excerpt,
+                "status": result.get("status", "ok"),
+            }
+    except Exception:
+        pass
+
+    explain = build_plain_language_explanation(title, summary, summary)
+    return {
+        "explain": explain,
+        "excerpt": summarize_text(summary, max_sentences=3, max_chars=420),
+        "status": "fetch_failed_fallback",
+    }
+
+
 def handle_command(command: str, args: List[str], user_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
     """
     处理用户命令
@@ -725,8 +774,16 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
         if not last_item:
             _safe_log_event(user_id, "read_miss", metadata={"reason": "no_last_item"})
             return {"message": "还没有可展开的文章，先试试 /brush", "buttons": action_buttons}
-        _safe_log_event(user_id, "read", last_item)
-        return {"message": build_deep_read_message(last_item), "buttons": action_buttons}
+        deep_read_payload = _build_deep_read_payload(last_item)
+        _safe_log_event(user_id, "read", last_item, metadata={"deep_read_status": deep_read_payload.get("status", "")})
+        return {
+            "message": build_deep_read_message(
+                last_item,
+                deep_read_summary=deep_read_payload.get("explain", ""),
+                deep_read_excerpt=deep_read_payload.get("excerpt", ""),
+            ),
+            "buttons": action_buttons,
+        }
     
     elif command == "/brush save":
         if _is_cold_start_active(profile):

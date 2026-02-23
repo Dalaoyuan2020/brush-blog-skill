@@ -33,6 +33,7 @@
 2. 预期输出包含：
    - `📰 博客卡片`
    - `按钮：[👍 感兴趣] ...`
+   - `/brush read` 返回 `🧠 大白话讲解` 与 `📚 正文摘录`
    - `/brush save` 返回 `✅ 已收藏` 且包含 `已沉淀到...`
 3. 优先源验证：
    - 正常网络下，输出应带 `原文：` 链接（真实文章）
@@ -89,9 +90,10 @@ python3 scripts/m8_smoke_test.py
 2) 是否打印博客卡片与按钮文案
 3) 是否打印原文链接（原文：...）
 4) `/brush save` 是否输出收藏+沉淀文案
-5) `behavior_events.jsonl` 是否记录 save 事件
-6) `saved_notes.jsonl` 是否新增结构化笔记
-7) 若失败，请给出失败步骤、报错原文、定位建议
+5) `/brush read` 是否包含“大白话讲解 + 正文摘录”
+6) `behavior_events.jsonl` 是否记录 save 事件
+7) `saved_notes.jsonl` 是否新增结构化笔记
+8) 若失败，请给出失败步骤、报错原文、定位建议
 
 报告格式：
 - 结果：PASS/FAIL
