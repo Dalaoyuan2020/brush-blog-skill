@@ -7,7 +7,7 @@
 ## 当前状态
 - **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → 🔄 M11-M12 待开发
 - **进度**: v1.0 阶段进度 100%；全路线进度约 83%（10/12 里程碑）
-- **最后更新**: Codex / 2026-02-23 10:44
+- **最后更新**: Codex / 2026-02-23 10:49
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -110,6 +110,7 @@
 - 2026-02-23 10:31 / Codex：完成 M10-2（读命令接入），`/brush read` 改为先抓取原文正文并生成“🧠 大白话讲解 + 📚 正文摘录”；抓取失败自动回退 RSS 摘要，不影响主流程。
 - 2026-02-23 10:42 / Codex：完成 M10-3（回归与配置），`python3 -m py_compile` 与 `scripts/m8_smoke_test.py` 通过；`config.yaml` 标记 `m10_deep_read: true`，`README.md` 与 `docs/USER_FEEDBACK_2026-02-23.md` 完成状态对齐。
 - 2026-02-23 10:45 / Codex：完成 M10-4（验收手册升级），更新 `docs/CLAW_MANAGER_TEST_MANUAL.md`：新增 `/brush read` 的“大白话讲解 + 正文摘录”检查项，供 VPS 复测。
+- 2026-02-23 10:49 / Codex：完成展板同步：通过 Notion API 追加 M10 完成 callout（commit `59be455`，下一步 M11）。
 
 ## 测试验收（本地，M10 深度阅读）
 - **执行命令**: `PYTHONPATH=src python3 -c "from main import handle_command ... /brush read"`
