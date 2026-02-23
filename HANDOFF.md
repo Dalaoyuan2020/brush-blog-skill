@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → ✅ M11 完成 → ✅ M12 完成（VPS 验收通过）→ ✅ V2.0 执行中（任务 1.1、2.1、1.2、1.4、1.3、2.2、2.3、3.2、3.3 已完成 + 第 4 批端到端测试通过 + Agent 调度练习完成）
-- **进度**: v1.0 阶段进度 100%；V2.0 当前进度 11/12（任务 1.1 + 2.1 + 1.2 + 1.4 + 1.3 + 2.2 + 2.3 + 3.2 + 3.3 完成 + 端到端测试通过 + Agent 调度验证通过）
-- **最后更新**: Codex / 2026-02-23 19:28
+- **阶段**: ✅ V2.0 完成，项目阶段性收官（第 1~5 批全部 PASS）
+- **进度**: V1.0 + V2.0 目标已完成（阶段完成率 100%）
+- **最后更新**: Codex / 2026-02-23 20:18
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -17,11 +17,19 @@
 - 推荐算法公式：Interest×0.4 + Knowledge×0.3 + Diversity×0.2 + Popularity×0.1（M12 快速学习期临时提升 Diversity 到 0.4）
 
 ## 下阶段目标
-- **任务**: 启动 V2.0 Skills 设计（问题收敛 + 方案评审）
+- **任务**: 进入 V2.1 Backlog 迭代（问题优化 + 发布完善）
 - **由谁来做**: Codex / Claude Code
-- **预期产出**: V2.0 设计文档（范围、优先级、验收标准）
+- **预期产出**: 体验与稳定性改进、并发锁、ClawdHub 发布
 - **预期时间**: 1 个迭代
-- **起点**: M12 VPS 测试已通过，进入 V2.0 规划阶段
+- **起点**: V2.0 第 5 批 cron/cleanup/logs 已通过 claw 验收
+
+## 未来可做（Backlog）
+- FB-002：深度阅读不完整（增强原文抓取质量与成功率）
+- FB-003：AI 摘要质量（增加比喻与例子，减少术语堆砌）
+- FB-004：冷启动兴趣选择体验优化（V2 架构下微调）
+- FB-005：推荐体验持续优化（去重/多样性/稳定性）
+- 并发锁机制：避免多 Agent 同时刷新导致写冲突
+- ClawdHub 发布：补齐发布物料并完成正式上架
 
 ## 验收标准（M1 骨架搭建）
 - [x] 所有模块文件创建完成（见 PLAN.md 文件结构）
@@ -134,6 +142,7 @@
 - 2026-02-23 19:26 / Codex：完成 V2.0 `任务 3.2`：`src/pool_manager.py` 新增 `cleanup` 子命令，支持 `python3 src/pool_manager.py cleanup --days N`，按发布时间（`published_at`/`fetched_at`）删除超过阈值天数的文章并写回 `shared/content_pool.json`。
 - 2026-02-23 19:28 / Codex：完成 V2.0 `任务 3.3`：为 `refresh`/`cleanup` 新增运行日志 `shared/pool_log.jsonl`（JSONL 追加模式），记录 `action/timestamp/articles_added|removed/pool_size/duration_sec`。
 - 2026-02-23 19:31 / Codex：完成第 5 批验收：`refresh -> cleanup --days 0 -> refresh -> cleanup --days 7` 全流程通过；强制清理删除 `20` 篇后池子归零，正常清理删除 `0` 篇；`shared/pool_log.jsonl` 共 `4` 条日志。
+- 2026-02-23 20:18 / Codex：读取 Notion《PROJECT_RETROSPECTIVE.md》并完成最终收口：README 重写为 V2.0 架构版、HANDOFF 更新为“阶段性收官”、补充未来 Backlog（FB-002~005、并发锁、ClawdHub 发布）。
 
 ## 测试验收（本地，M12 冷启动兴趣选择）
 - **执行命令**: `python3 -m py_compile src/main.py src/interaction/telegram.py scripts/m8_smoke_test.py`

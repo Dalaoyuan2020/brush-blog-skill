@@ -3,6 +3,11 @@ __pycache__/
 *.pyc
 *.pyo
 
+# V2 runtime cache/logs
+data/
+shared/content_pool.json
+shared/pool_log.jsonl
+
 # User data (don't push personal profiles)
 data/profiles/
 data/behavior_events.jsonl
