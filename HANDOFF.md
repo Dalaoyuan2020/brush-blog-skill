@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → ✅ M11 完成 → ✅ M12 完成（VPS 验收通过）→ 🚧 V2.0 执行中（任务 1.1、2.1、1.2、1.4、1.3 已完成）
-- **进度**: v1.0 阶段进度 100%；V2.0 当前进度 5/12（任务 1.1 + 2.1 + 1.2 + 1.4 + 1.3 完成）
-- **最后更新**: Codex / 2026-02-23 17:12
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → ✅ M11 完成 → ✅ M12 完成（VPS 验收通过）→ 🚧 V2.0 执行中（任务 1.1、2.1、1.2、1.4、1.3、2.2、2.3 已完成）
+- **进度**: v1.0 阶段进度 100%；V2.0 当前进度 7/12（任务 1.1 + 2.1 + 1.2 + 1.4 + 1.3 + 2.2 + 2.3 完成）
+- **最后更新**: Codex / 2026-02-23 17:26
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -128,6 +128,8 @@
 - 2026-02-23 17:12 / Codex：完成 V2.0 `任务 1.3`：`/brush` 输出状态行扩展为 `POOL_SIZE: N`、`POOL_LOW: true/false`、`POOL_EMPTY: true/false`，供 Agent 精准调度补货。
 - 2026-02-23 17:15 / Codex：第 2 批验收命令通过：`python3 src/pool_manager.py refresh` 结果池子 `20` 篇且 URL 去重为 `True`；`echo '{\"articles\":[]}' > shared/content_pool.json` 后 `/brush` 正确输出 `POOL_SIZE: 0`、`POOL_EMPTY: true`。
 - 2026-02-23 17:17 / Codex：补充验证 `任务 1.4`：清空历史后连续执行 `/brush` 10 次，标题唯一数 `10`（24h 已读去重生效）。
+- 2026-02-23 17:24 / Codex：完成 V2.0 `任务 2.2`：重写 `SKILL.md` 为 OpenClaw Skills 规范格式，frontmatter 单行 key，`metadata` 为单行 JSON，命令与状态行协议对齐 V2.0。
+- 2026-02-23 17:26 / Codex：完成 V2.0 `任务 2.3`：新增 `docs/AGENT_INSTRUCTIONS.md`，定义 `/brush` 调度全流程（exec→message→状态判定→同步/异步刷新），并补充 `sessions_spawn` 合法参数示例与“子代理不可嵌套 spawn”限制说明。
 
 ## 测试验收（本地，M12 冷启动兴趣选择）
 - **执行命令**: `python3 -m py_compile src/main.py src/interaction/telegram.py scripts/m8_smoke_test.py`
