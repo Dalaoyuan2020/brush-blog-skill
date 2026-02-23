@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → 🔄 M11-M12 待开发
-- **进度**: v1.0 阶段进度 100%；全路线进度约 83%（10/12 里程碑）
-- **最后更新**: Codex / 2026-02-23 11:24
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → ✅ M11 完成 → 🔄 M12 待开发
+- **进度**: v1.0 阶段进度 100%；全路线进度约 92%（11/12 里程碑）
+- **最后更新**: Codex / 2026-02-23 11:35
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -17,11 +17,11 @@
 - 推荐算法公式：Interest×0.4 + Knowledge×0.3 + Diversity×0.2 + Popularity×0.1
 
 ## 下阶段目标
-- **任务**: 继续实现 M11-M12（按钮可点击、兴趣选择优化）
+- **任务**: 实现 M12（冷启动兴趣选择优化）
 - **由谁来做**: Codex / Claude Code
 - **预期产出**: 可运行的 Skill 代码
 - **预期时间**: 待按 `docs/USER_FEEDBACK_2026-02-23.md` 拆分排期
-- **起点**: 从 M11 Telegram 按钮可点击开始
+- **起点**: 冷启动兴趣选 2-3 类并初始化权重
 
 ## 验收标准（M1 骨架搭建）
 - [x] 所有模块文件创建完成（见 PLAN.md 文件结构）
@@ -113,6 +113,17 @@
 - 2026-02-23 10:49 / Codex：完成展板同步：通过 Notion API 追加 M10 完成 callout（commit `59be455`，下一步 M11）。
 - 2026-02-23 11:21 / Codex：根据羊爸爸指令调整 M11 策略：停止离线猜测式改造，改由 claw 管家切换 `/opus` 在在线运行环境完成“按钮可点击”落地；新增专项文档指导执行与经验沉淀。
 - 2026-02-23 11:24 / Codex：完成展板同步：通过 Notion API 追加 M11 策略更新 callout（commit `0175718`，等待 claw 在线闭环结果）。
+- 2026-02-23 11:30 / Codex：接收 claw 管家 M11 验收报告（commit `d360f19`）：最小闭环与完整 5 按钮组均可点击并成功 callback；经验文档已沉淀至 `docs/M11_BUTTON_FIX_EXPERIENCE.md`。
+- 2026-02-23 11:34 / Codex：完成 M11 收口：`config.yaml` 标记 `m11_inline_buttons: true`，并更新 `README.md` 与 `docs/USER_FEEDBACK_2026-02-23.md` 的里程碑状态。
+
+## 测试验收（VPS，M11 最终）
+- **测试环境**: claw 管家在线运行环境（/opus）
+- **测试版本**: `d360f19`
+- **结果**: ✅ PASS
+- **证据摘要**:
+  - 最小闭环 PASS：inline button 发送成功（messageId: 6134）→ 点击 `👍 感兴趣` → callback `/brush like` 生效
+  - 完整按钮组 PASS：5 按钮可点击（messageId: 6140），`/brush like|skip|read|save|refresh` 全部触发成功
+  - 经验沉淀：`docs/M11_BUTTON_FIX_EXPERIENCE.md`
 
 ## 测试验收（本地，M10 深度阅读）
 - **执行命令**: `PYTHONPATH=src python3 -c "from main import handle_command ... /brush read"`

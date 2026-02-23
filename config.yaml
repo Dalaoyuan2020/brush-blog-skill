@@ -49,5 +49,5 @@ milestones:
   m8_release: true
   m9_performance: true
   m10_deep_read: true
-  m11_inline_buttons: false
+  m11_inline_buttons: true
   m12_interest_selection: false
