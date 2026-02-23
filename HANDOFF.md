@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → ✅ M11 完成 → ✅ M12 完成（VPS 验收通过）
-- **进度**: v1.0 阶段进度 100%；全路线开发进度 100%（12/12 里程碑）
-- **最后更新**: Codex / 2026-02-23 12:12
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → ✅ M11 完成 → ✅ M12 完成（VPS 验收通过）→ 🚧 V2.0 执行中（任务 1.1、2.1 已完成）
+- **进度**: v1.0 阶段进度 100%；V2.0 当前进度 2/12（任务 1.1 + 2.1 完成）
+- **最后更新**: Codex / 2026-02-23 16:27
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -120,6 +120,9 @@
 - 2026-02-23 11:54 / Codex：完成 M12-3（回归与文档），更新 `scripts/m8_smoke_test.py` 适配新冷启动路径，`python3 scripts/m8_smoke_test.py` 本地 PASS；同时完成 `README.md`、`SKILL.md`、`docs/CLAW_MANAGER_TEST_MANUAL.md`、`docs/USER_FEEDBACK_2026-02-23.md`、`config.yaml` 对齐。
 - 2026-02-23 12:10 / Codex：接收 claw 管家 M12 VPS 验收报告：`m8_smoke_test PASS`、`/brush choose` 可用、`/brush start` 可用、按钮 callback 正常；结论为 M12 可用并通过验收。
 - 2026-02-23 12:12 / Codex：完成 M12 收口：更新 `HANDOFF.md` 状态到“12/12 完成”，并切换下阶段目标为 V2.0 Skills 设计启动。
+- 2026-02-23 16:20 / Codex：完成 V2.0 `任务 1.1`：创建 `shared/` 目录与三个共享数据文件（`shared/content_pool.json`、`shared/read_history.json`、`shared/user_prefs.json`），并通过 `python3` JSON 解析校验。
+- 2026-02-23 16:27 / Codex：完成 V2.0 `任务 2.1`：`src/main.py` 的 `/brush` 改为纯读模式（仅读取 `shared/content_pool.json` + `shared/read_history.json`，不再触发 `refresh_content_pool()` 同步刷新）；输出追加 `POOL_LOW`/`POOL_EMPTY` 状态行供 Agent 调度。
+- 2026-02-23 16:27 / Codex：V2.0 任务 2.1 验收通过：`/usr/bin/time -p python3 src/main.py /brush` 实测 `real 0.15s`（<1s），输出合法卡片文本且包含 `POOL_LOW: true`、`POOL_EMPTY: true`。
 
 ## 测试验收（本地，M12 冷启动兴趣选择）
 - **执行命令**: `python3 -m py_compile src/main.py src/interaction/telegram.py scripts/m8_smoke_test.py`

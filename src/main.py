@@ -4,18 +4,15 @@
 """
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fetcher.rss import (
-    collect_latest_articles,
-    get_content_pool_stats,
     list_articles_by_category,
-    list_articles_from_pool,
     load_feeds,
-    refresh_content_pool,
 )
 from fetcher.reader import (
     build_deep_read_snippet,
@@ -38,9 +35,14 @@ ROOT_DIR = Path(__file__).resolve().parent.parent
 FEEDS_FILE = ROOT_DIR / "data" / "feeds.json"
 CONTENT_DB = ROOT_DIR / "data" / "content.db"
 PROFILES_DIR = ROOT_DIR / "data" / "profiles"
+SHARED_DIR = ROOT_DIR / "shared"
+SHARED_CONTENT_POOL_FILE = SHARED_DIR / "content_pool.json"
+SHARED_READ_HISTORY_FILE = SHARED_DIR / "read_history.json"
+SHARED_USER_PREFS_FILE = SHARED_DIR / "user_prefs.json"
 BEHAVIOR_EVENTS_FILE = ROOT_DIR / "data" / "behavior_events.jsonl"
 SAVED_NOTES_FILE = ROOT_DIR / "data" / "saved_notes.jsonl"
 READ_HISTORY_LIMIT = 100
+SHARED_READ_HISTORY_LIMIT = 300
 SAVED_ITEMS_LIMIT = 200
 SOURCE_HISTORY_LIMIT = 50
 COLD_START_MIN_SELECTIONS = 2
@@ -118,12 +120,7 @@ def _env_float(name: str, default: float, min_value: float = 0.0, max_value: flo
     return value
 
 
-POOL_MIN_ITEMS = _env_int("BRUSH_POOL_MIN_ITEMS", 4)
-POOL_REFRESH_MIN_INTERVAL_SECONDS = _env_int("BRUSH_POOL_REFRESH_INTERVAL_SEC", 20 * 60)
-POOL_REFRESH_TIMEOUT_SECONDS = _env_int("BRUSH_POOL_REFRESH_TIMEOUT_SEC", 4)
-POOL_REFRESH_MAX_ITEMS = _env_int("BRUSH_POOL_REFRESH_MAX_ITEMS", 4)
-POOL_REFRESH_PER_CATEGORY_LIMIT = _env_int("BRUSH_POOL_REFRESH_PER_CATEGORY", 1)
-FALLBACK_FETCH_TIMEOUT_SECONDS = _env_int("BRUSH_FALLBACK_FETCH_TIMEOUT_SEC", 4)
+POOL_MIN_ITEMS = _env_int("BRUSH_POOL_MIN_ITEMS", 5)
 DEEP_READ_FETCH_TIMEOUT_SECONDS = _env_int("BRUSH_DEEP_READ_TIMEOUT_SEC", 6)
 QUICK_LEARN_INTERACTIONS = _env_int("BRUSH_QUICK_LEARN_INTERACTIONS", 20)
 QUICK_LEARN_DIVERSITY_WEIGHT = _env_float("BRUSH_QUICK_LEARN_DIVERSITY_WEIGHT", 0.4)
@@ -162,42 +159,137 @@ def _load_feeds_cached() -> Dict[str, List[Dict[str, Any]]]:
     return feeds
 
 
-def _should_refresh_content_pool() -> bool:
-    """
-    Decide whether to refresh RSS pool based on age and item count.
-    """
+def _read_json_file(path: Path, default: Any) -> Any:
+    if not path.exists():
+        return default
     try:
-        stats = get_content_pool_stats(CONTENT_DB)
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
     except Exception:
-        return True
-
-    total = int(stats.get("total_count", 0) or 0)
-    age_seconds = stats.get("age_seconds")
-    if total < POOL_MIN_ITEMS:
-        return True
-    if age_seconds is None:
-        return True
-    return int(age_seconds) >= POOL_REFRESH_MIN_INTERVAL_SECONDS
+        return default
 
 
-def _maybe_refresh_content_pool(feeds: Dict[str, List[Dict[str, Any]]]) -> None:
-    """
-    Lightweight refresh: only refresh when pool is stale or too small.
-    """
-    if not _should_refresh_content_pool():
+def _write_json_file(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+
+
+def _load_shared_content_pool() -> Dict[str, Any]:
+    default_pool = {
+        "articles": [],
+        "last_refresh": "",
+        "pool_size": 0,
+        "min_threshold": POOL_MIN_ITEMS,
+    }
+    data = _read_json_file(SHARED_CONTENT_POOL_FILE, default_pool)
+    if not isinstance(data, dict):
+        return dict(default_pool)
+    data.setdefault("articles", [])
+    data.setdefault("last_refresh", "")
+    data.setdefault("pool_size", 0)
+    data.setdefault("min_threshold", POOL_MIN_ITEMS)
+    return data
+
+
+def _load_shared_read_history() -> List[str]:
+    data = _read_json_file(SHARED_READ_HISTORY_FILE, [])
+    if not isinstance(data, list):
+        return []
+    history: List[str] = []
+    for value in data:
+        if not isinstance(value, str):
+            continue
+        item_key = value.strip()
+        if item_key:
+            history.append(item_key)
+    return history
+
+
+def _load_shared_user_prefs() -> Dict[str, Any]:
+    default_prefs = {
+        "interest_tags": {},
+        "preferred_categories": [],
+        "blocked_sources": [],
+        "updated_at": "",
+    }
+    data = _read_json_file(SHARED_USER_PREFS_FILE, default_prefs)
+    if not isinstance(data, dict):
+        return dict(default_prefs)
+    data.setdefault("interest_tags", {})
+    data.setdefault("preferred_categories", [])
+    data.setdefault("blocked_sources", [])
+    data.setdefault("updated_at", "")
+    return data
+
+
+def _save_shared_read_history(history: List[str]) -> None:
+    _write_json_file(SHARED_READ_HISTORY_FILE, history)
+
+
+def _normalize_pool_tags(raw_tags: Any) -> List[str]:
+    if not isinstance(raw_tags, list):
+        return []
+    tags: List[str] = []
+    for value in raw_tags:
+        if not isinstance(value, str):
+            continue
+        tag = value.strip().lstrip("#")
+        if not tag or tag in tags:
+            continue
+        tags.append(tag)
+    return tags
+
+
+def _item_key_from_article(article: Dict[str, Any]) -> str:
+    for key in ("item_key", "id"):
+        raw = article.get(key, "")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+
+    title = str(article.get("title", "")).strip()
+    link = str(article.get("url", article.get("link", ""))).strip()
+    source = str(article.get("source", "")).strip()
+    base = link or "{0}|{1}".format(title, source)
+    if not base:
+        base = "unknown"
+    return hashlib.sha1(base.encode("utf-8")).hexdigest()
+
+
+def _normalize_pool_article(article: Dict[str, Any]) -> Dict[str, Any]:
+    link = str(article.get("url", article.get("link", "")) or "").strip()
+    category = str(article.get("category", "") or "").strip()
+    tags = _normalize_pool_tags(article.get("tags", []))
+    if not tags and category:
+        tags = [value for value in category.split("_") if value]
+
+    return {
+        "item_key": _item_key_from_article(article),
+        "title": str(article.get("title", "Untitled") or "Untitled").strip(),
+        "summary": str(article.get("summary", "暂无摘要") or "暂无摘要").strip(),
+        "link": link,
+        "source": str(article.get("source", "unknown") or "unknown").strip(),
+        "tags": tags,
+        "category": category or "general",
+    }
+
+
+def _record_shared_read_history(item_key: str) -> None:
+    if not item_key:
         return
+    history = _load_shared_read_history()
+    history = [value for value in history if value != item_key]
+    history.append(item_key)
+    history = history[-SHARED_READ_HISTORY_LIMIT:]
+    _save_shared_read_history(history)
 
-    try:
-        refresh_content_pool(
-            feeds,
-            db_path=CONTENT_DB,
-            priority_category="priority_hn_popular_2025",
-            per_category_limit=POOL_REFRESH_PER_CATEGORY_LIMIT,
-            max_items=POOL_REFRESH_MAX_ITEMS,
-            timeout=POOL_REFRESH_TIMEOUT_SECONDS,
-        )
-    except Exception:
-        return
+
+def _append_pool_status(message: str, pool_low: bool, pool_empty: bool) -> str:
+    return "{0}\nPOOL_LOW: {1}\nPOOL_EMPTY: {2}".format(
+        message,
+        "true" if pool_low else "false",
+        "true" if pool_empty else "false",
+    )
 
 
 def _build_recommended_item(
@@ -206,66 +298,64 @@ def _build_recommended_item(
     weights: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
     """
-    Build one recommended card item from content pool with live fallback.
+    Build one recommended card item from shared content pool.
+    This path is read-only and performs no network requests.
     """
     card_item = _build_mock_item(feeds)
-    history_item_keys = profile.get("read_history", [])
-    if not isinstance(history_item_keys, list):
-        history_item_keys = []
-    exclude_keys = history_item_keys
+    pool_data = _load_shared_content_pool()
+    raw_articles = pool_data.get("articles", [])
+    if not isinstance(raw_articles, list):
+        raw_articles = []
+    candidates = [_normalize_pool_article(article) for article in raw_articles if isinstance(article, dict)]
 
-    _maybe_refresh_content_pool(feeds)
-
+    declared_pool_size = pool_data.get("pool_size", 0)
     try:
-        candidates = list_articles_from_pool(
-            CONTENT_DB,
-            priority_category="priority_hn_popular_2025",
-            exclude_item_keys=exclude_keys,
-            limit=50,
-        )
-        if candidates:
-            ranked = rank_items(
-                candidates,
-                profile=profile,
-                recent_sources=profile.get("source_history", [])
-                if isinstance(profile.get("source_history", []), list)
-                else [],
-                weights=weights or BASE_RECOMMEND_WEIGHTS,
-            )
-            pooled_article = ranked[0]
-        else:
-            pooled_article = None
+        declared_pool_size = int(declared_pool_size)
     except Exception:
-        pooled_article = None
+        declared_pool_size = 0
+    pool_size = max(len(candidates), max(0, declared_pool_size))
 
-    if pooled_article:
-        card_item.update(
-            {
-                "title": pooled_article.get("title", card_item["title"]),
-                "summary": pooled_article.get("summary", card_item["summary"]),
-                "tags": pooled_article.get("tags", card_item["tags"]),
-                "source": pooled_article.get("source", card_item["source"]),
-                "link": pooled_article.get("link", ""),
-                "item_key": pooled_article.get("item_key", ""),
-            }
-        )
+    min_threshold = pool_data.get("min_threshold", POOL_MIN_ITEMS)
+    try:
+        min_threshold = max(1, int(min_threshold))
+    except Exception:
+        min_threshold = POOL_MIN_ITEMS
+
+    pool_empty = pool_size == 0
+    pool_low = pool_size < min_threshold
+
+    if not candidates:
+        card_item["item_key"] = ""
+        card_item["_pool_low"] = pool_low
+        card_item["_pool_empty"] = pool_empty
         return card_item
 
-    try:
-        articles = collect_latest_articles(
-            feeds,
-            priority_category="priority_hn_popular_2025",
-            per_category_limit=1,
-            max_items=1,
-            timeout=FALLBACK_FETCH_TIMEOUT_SECONDS,
-        )
-    except Exception:
-        articles = []
+    shared_history = _load_shared_read_history()
+    profile_history = profile.get("read_history", [])
+    if not isinstance(profile_history, list):
+        profile_history = []
+    exclude_keys = set(shared_history + [str(value) for value in profile_history if isinstance(value, str)])
 
-    if not articles:
-        return card_item
+    filtered = [item for item in candidates if item.get("item_key", "") not in exclude_keys]
+    if not filtered:
+        filtered = candidates
 
-    top_article = articles[0]
+    shared_prefs = _load_shared_user_prefs()
+    rank_profile = dict(profile)
+    if not isinstance(rank_profile.get("interest_tags", {}), dict) or not rank_profile.get("interest_tags", {}):
+        if isinstance(shared_prefs.get("interest_tags", {}), dict):
+            rank_profile["interest_tags"] = dict(shared_prefs.get("interest_tags", {}))
+
+    ranked = rank_items(
+        filtered,
+        profile=rank_profile,
+        recent_sources=profile.get("source_history", [])
+        if isinstance(profile.get("source_history", []), list)
+        else [],
+        weights=weights or BASE_RECOMMEND_WEIGHTS,
+    )
+    top_article = ranked[0] if ranked else filtered[0]
+
     card_item.update(
         {
             "title": top_article.get("title", card_item["title"]),
@@ -273,7 +363,9 @@ def _build_recommended_item(
             "tags": top_article.get("tags", card_item["tags"]),
             "source": top_article.get("source", card_item["source"]),
             "link": top_article.get("link", ""),
-            "item_key": "",
+            "item_key": top_article.get("item_key", ""),
+            "_pool_low": pool_low,
+            "_pool_empty": pool_empty,
         }
     )
     return card_item
@@ -867,12 +959,20 @@ def _advance_cold_start(
     return response
 
 
-def _next_item_response(user_id: str, profile: Dict[str, Any], feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
+def _next_item_response(
+    user_id: str,
+    profile: Dict[str, Any],
+    feeds: Dict[str, List[Dict[str, Any]]],
+    include_pool_status: bool = False,
+) -> Dict[str, Any]:
     learning = _ensure_learning_state(profile)
     weights = _resolve_recommend_weights(profile)
     card_item = _build_recommended_item(feeds, profile=profile, weights=weights)
+    pool_low = bool(card_item.pop("_pool_low", False))
+    pool_empty = bool(card_item.pop("_pool_empty", False))
     profile["last_item"] = card_item
     profile = _record_read_history(profile, card_item.get("item_key", ""))
+    _record_shared_read_history(card_item.get("item_key", ""))
     profile = _record_source_history(profile, card_item.get("source", ""))
 
     quick_hint = ""
@@ -913,6 +1013,8 @@ def _next_item_response(user_id: str, profile: Dict[str, Any], feeds: Dict[str, 
     response = _build_brush_response(card_item)
     if quick_hint:
         response["message"] = quick_hint + response["message"]
+    if include_pool_status:
+        response["message"] = _append_pool_status(response["message"], pool_low=pool_low, pool_empty=pool_empty)
     return response
 
 
@@ -1053,9 +1155,14 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
     # 主命令：开始刷博客
     if command == "/brush":
         feeds = _load_feeds_cached()
-        if _is_cold_start_active(profile):
-            return _cold_start_response(user_id, profile, feeds)
-        return _next_item_response(user_id, profile, feeds)
+        # V2.0 任务 2.1：/brush 固定走纯读模式，不触发冷启动或同步刷新。
+        state = _ensure_cold_start_state(profile)
+        if bool(state.get("active", False)) and not bool(state.get("completed", False)):
+            state["active"] = False
+            state["completed"] = True
+            state["seed_items"] = []
+            state["current_index"] = 0
+        return _next_item_response(user_id, profile, feeds, include_pool_status=True)
 
     elif command.startswith("/brush choose"):
         feeds = _load_feeds_cached()
