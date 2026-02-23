@@ -47,3 +47,7 @@ milestones:
   m6_sink: true
   m7_cold_start: true
   m8_release: true
+  m9_performance: true
+  m10_deep_read: false
+  m11_inline_buttons: false
+  m12_interest_selection: false

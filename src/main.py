@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional
 
 from fetcher.rss import (
     collect_latest_articles,
+    get_content_pool_stats,
+    list_articles_by_category,
     list_articles_from_pool,
     load_feeds,
     refresh_content_pool,
@@ -63,6 +65,28 @@ COLD_START_CATEGORY_ALIASES = {
 }
 
 
+def _env_int(name: str, default: int, min_value: int = 1) -> int:
+    raw = os.getenv(name, "")
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except Exception:
+        return default
+    if value < min_value:
+        return min_value
+    return value
+
+
+POOL_MIN_ITEMS = _env_int("BRUSH_POOL_MIN_ITEMS", 4)
+POOL_REFRESH_MIN_INTERVAL_SECONDS = _env_int("BRUSH_POOL_REFRESH_INTERVAL_SEC", 20 * 60)
+POOL_REFRESH_TIMEOUT_SECONDS = _env_int("BRUSH_POOL_REFRESH_TIMEOUT_SEC", 4)
+POOL_REFRESH_MAX_ITEMS = _env_int("BRUSH_POOL_REFRESH_MAX_ITEMS", 4)
+POOL_REFRESH_PER_CATEGORY_LIMIT = _env_int("BRUSH_POOL_REFRESH_PER_CATEGORY", 1)
+FALLBACK_FETCH_TIMEOUT_SECONDS = _env_int("BRUSH_FALLBACK_FETCH_TIMEOUT_SEC", 4)
+_FEEDS_CACHE: Dict[str, Any] = {"mtime": None, "data": None}
+
+
 def _build_mock_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
     """Create one fake card item based on configured feeds."""
     first_category = next(iter(feeds), "tech_programming")
@@ -77,6 +101,62 @@ def _build_mock_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
     }
 
 
+def _load_feeds_cached() -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Read feeds config with mtime cache to avoid repetitive JSON parsing.
+    """
+    try:
+        mtime = FEEDS_FILE.stat().st_mtime
+    except Exception:
+        mtime = None
+
+    if _FEEDS_CACHE.get("data") is not None and _FEEDS_CACHE.get("mtime") == mtime:
+        return _FEEDS_CACHE["data"]
+
+    feeds = load_feeds(FEEDS_FILE)
+    _FEEDS_CACHE["mtime"] = mtime
+    _FEEDS_CACHE["data"] = feeds
+    return feeds
+
+
+def _should_refresh_content_pool() -> bool:
+    """
+    Decide whether to refresh RSS pool based on age and item count.
+    """
+    try:
+        stats = get_content_pool_stats(CONTENT_DB)
+    except Exception:
+        return True
+
+    total = int(stats.get("total_count", 0) or 0)
+    age_seconds = stats.get("age_seconds")
+    if total < POOL_MIN_ITEMS:
+        return True
+    if age_seconds is None:
+        return True
+    return int(age_seconds) >= POOL_REFRESH_MIN_INTERVAL_SECONDS
+
+
+def _maybe_refresh_content_pool(feeds: Dict[str, List[Dict[str, Any]]]) -> None:
+    """
+    Lightweight refresh: only refresh when pool is stale or too small.
+    """
+    if not _should_refresh_content_pool():
+        return
+
+    try:
+        refresh_content_pool(
+            feeds,
+            db_path=CONTENT_DB,
+            priority_category="priority_hn_popular_2025",
+            per_category_limit=POOL_REFRESH_PER_CATEGORY_LIMIT,
+            max_items=POOL_REFRESH_MAX_ITEMS,
+            timeout=POOL_REFRESH_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        return
+
+
 def _build_recommended_item(feeds: Dict[str, List[Dict[str, Any]]], profile: Dict[str, Any]) -> Dict[str, Any]:
     """
     Build one recommended card item from content pool with live fallback.
@@ -87,17 +167,7 @@ def _build_recommended_item(feeds: Dict[str, List[Dict[str, Any]]], profile: Dic
         history_item_keys = []
     exclude_keys = history_item_keys
 
-    try:
-        refresh_content_pool(
-            feeds,
-            db_path=CONTENT_DB,
-            priority_category="priority_hn_popular_2025",
-            per_category_limit=1,
-            max_items=12,
-            timeout=10,
-        )
-    except Exception:
-        pass
+    _maybe_refresh_content_pool(feeds)
 
     try:
         candidates = list_articles_from_pool(
@@ -145,7 +215,7 @@ def _build_recommended_item(feeds: Dict[str, List[Dict[str, Any]]], profile: Dic
             priority_category="priority_hn_popular_2025",
             per_category_limit=1,
             max_items=1,
-            timeout=10,
+            timeout=FALLBACK_FETCH_TIMEOUT_SECONDS,
         )
     except Exception:
         articles = []
@@ -349,24 +419,18 @@ def _pick_cold_start_categories(feeds: Dict[str, List[Dict[str, Any]]]) -> List[
 def _build_seed_item(feeds: Dict[str, List[Dict[str, Any]]], category: str) -> Dict[str, Any]:
     article = None
     try:
-        articles = collect_latest_articles(
-            feeds,
-            priority_category=category,
-            per_category_limit=1,
-            max_items=1,
-            timeout=8,
-        )
+        pooled = list_articles_by_category(CONTENT_DB, category=category, limit=1)
     except Exception:
-        articles = []
-    if articles:
-        article = articles[0]
+        pooled = []
+    if pooled:
+        article = pooled[0]
 
     feed_source = feeds.get(category, [{}])[0] if feeds.get(category) else {}
     if not article:
         source_name = feed_source.get("site", feed_source.get("name", "unknown"))
         seed = {
             "title": "领域种子：{0}".format(feed_source.get("name", category)),
-            "summary": "这是冷启动种子内容，用于快速了解你的阅读偏好。",
+            "summary": "先告诉我你对这个领域是否感兴趣，我会据此调整推荐方向。",
             "tags": category.split("_"),
             "source": source_name,
             "link": "",
@@ -539,7 +603,7 @@ def _merge_command_and_args(command: str, args: List[str]) -> str:
 def _safe_log_event(
     user_id: str, action: str, item: Optional[Dict[str, Any]] = None, metadata: Optional[Dict[str, Any]] = None
 ) -> None:
-    """Log behavior event with error handling and console output for debugging."""
+    """Log behavior event safely without affecting main command flow."""
     try:
         log_behavior_event(
             events_path=BEHAVIOR_EVENTS_FILE,
@@ -548,12 +612,8 @@ def _safe_log_event(
             item=item,
             metadata=metadata,
         )
-        # Debug log for development
-        item_title = item.get("title", "unknown")[:50] if item else "none"
-        print(f"[DEBUG] Logged event: user={user_id}, action={action}, item={item_title}")
-    except Exception as e:
+    except Exception:
         # Behavior logging should not break command handling.
-        print(f"[DEBUG] Failed to log event: {e}")
         return
 
 
@@ -627,14 +687,14 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
 
     # 主命令：开始刷博客
     if command == "/brush":
-        feeds = load_feeds(FEEDS_FILE)
+        feeds = _load_feeds_cached()
         if _is_cold_start_active(profile):
             return _cold_start_response(user_id, profile, feeds)
         return _next_item_response(user_id, profile, feeds)
     
     # 按钮回调处理
     elif command == "/brush like":
-        feeds = load_feeds(FEEDS_FILE)
+        feeds = _load_feeds_cached()
         if _is_cold_start_active(profile):
             return _advance_cold_start(user_id, profile, feeds, action="like")
         last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
@@ -647,7 +707,7 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
         return response
     
     elif command == "/brush skip":
-        feeds = load_feeds(FEEDS_FILE)
+        feeds = _load_feeds_cached()
         if _is_cold_start_active(profile):
             return _advance_cold_start(user_id, profile, feeds, action="skip")
         last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
@@ -703,7 +763,7 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
         return {"message": save_message, "buttons": build_brush_buttons()}
     
     elif command == "/brush refresh":
-        feeds = load_feeds(FEEDS_FILE)
+        feeds = _load_feeds_cached()
         if _is_cold_start_active(profile):
             return _advance_cold_start(user_id, profile, feeds, action="refresh")
         _safe_log_event(

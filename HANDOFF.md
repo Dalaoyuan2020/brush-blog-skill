@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ 🔄 M9-M12 待开发
-- **进度**: v1.0 阶段进度 100%；全路线进度约 67%（8/12 里程碑）
-- **最后更新**: Codex / 2026-02-23 02:22
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → 🔄 M10-M12 待开发
+- **进度**: v1.0 阶段进度 100%；全路线进度约 75%（9/12 里程碑）
+- **最后更新**: Codex / 2026-02-23 10:13
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -17,11 +17,11 @@
 - 推荐算法公式：Interest×0.4 + Knowledge×0.3 + Diversity×0.2 + Popularity×0.1
 
 ## 下阶段目标
-- **任务**: 继续实现 M9-M12（性能优化、内容质量、交互可用性）
+- **任务**: 继续实现 M10-M12（全文深读/摘要质量、按钮可点击、兴趣选择）
 - **由谁来做**: Codex / Claude Code
 - **预期产出**: 可运行的 Skill 代码
 - **预期时间**: 待按 `docs/USER_FEEDBACK_2026-02-23.md` 拆分排期
-- **起点**: 从 M9 性能优化开始
+- **起点**: 从 M10 全文抓取 + 白话摘要开始
 
 ## 验收标准（M1 骨架搭建）
 - [x] 所有模块文件创建完成（见 PLAN.md 文件结构）
@@ -101,6 +101,19 @@
 - 2026-02-23 02:13 / Codex：接收 claw 管家 M8 最终验收（commit `bb53ee9`）：`M8 smoke test PASS`，命令链路/行为事件/保存笔记全部通过，项目状态收口为 M1-M8 全完成。
 - 2026-02-23 02:14 / Codex：完成最终展板同步：通过 Notion API 追加“项目完成（100%）”callout，记录最终收口提交 `b259cf8` 与验收结论。
 - 2026-02-23 02:22 / Codex：按 `OPEN_SOURCE.md` 与 `docs/USER_FEEDBACK_2026-02-23.md` 校正进度口径：将“100%”限定为 `v1.0 (M1-M8)`，并恢复全路线进度为 `8/12 ≈ 67%`，下一步转入 M9-M12。
+- 2026-02-23 10:08 / Codex：完成 M9-1（刷新节流），在 `src/main.py` 增加内容池刷新判定：仅在内容池过小或过旧时才拉取 RSS，避免每次 `/brush` 阻塞抓取。
+- 2026-02-23 10:10 / Codex：完成 M9-2（冷启动提速），冷启动种子改为优先读取 `content_pool`，缺失时使用本地种子文案，不再在首次 `/brush` 同步串行抓取多个 RSS。
+- 2026-02-23 10:11 / Codex：完成 M9-3（轻量优化），增加 `feeds.json` mtime 缓存、移除行为日志调试打印，并提供环境变量调优项（刷新间隔/超时/池容量）。
+- 2026-02-23 10:12 / Codex：M9 本地回归通过：`python3 -m py_compile` 与 `scripts/m8_smoke_test.py` 均 PASS；单次 `/brush` CLI 测量 `real 0.12s`（当前环境）。
+
+## 测试验收（本地，M9 性能）
+- **执行命令**: `/usr/bin/time -p python3 src/main.py /brush`
+- **执行命令**: `python3 scripts/m8_smoke_test.py`
+- **结果**: ✅ PASS
+- **证据摘要**:
+  - `/brush` 冷启动首响（当前环境）`real 0.12s`
+  - `M8 smoke test PASS`（核心命令链路无回归）
+  - 代码编译通过：`python3 -m py_compile src/main.py src/fetcher/rss.py`
 
 ## 测试验收（VPS，M8 最终）
 - **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
