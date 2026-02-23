@@ -1051,6 +1051,19 @@ def _next_item_response(
     pool_size = int(card_item.pop("_pool_size", 0) or 0)
     pool_low = bool(card_item.pop("_pool_low", False))
     pool_empty = bool(card_item.pop("_pool_empty", False))
+
+    # V2 bugfix: empty pool should not fall back to any mock/article card.
+    if pool_empty and pool_size <= 0:
+        return {
+            "message": _append_pool_status(
+                "📭 内容池为空，请等待刷新...",
+                pool_size=0,
+                pool_low=True,
+                pool_empty=True,
+            ),
+            "buttons": [],
+        }
+
     profile["last_item"] = card_item
     profile = _record_read_history(profile, card_item.get("item_key", ""))
     _record_shared_read_history(card_item.get("url", card_item.get("link", "")))
