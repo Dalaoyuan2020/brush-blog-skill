@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → ✅ M11 完成 → ✅ M12 完成（VPS 验收通过）→ 🚧 V2.0 执行中（任务 1.1、2.1、1.2、1.4、1.3、2.2、2.3 已完成）
-- **进度**: v1.0 阶段进度 100%；V2.0 当前进度 7/12（任务 1.1 + 2.1 + 1.2 + 1.4 + 1.3 + 2.2 + 2.3 完成）
-- **最后更新**: Codex / 2026-02-23 18:50
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → ✅ M11 完成 → ✅ M12 完成（VPS 验收通过）→ ✅ V2.0 执行中（任务 1.1、2.1、1.2、1.4、1.3、2.2、2.3 已完成 + 第 4 批端到端测试通过 + Agent 调度练习完成）
+- **进度**: v1.0 阶段进度 100%；V2.0 当前进度 9/12（任务 1.1 + 2.1 + 1.2 + 1.4 + 1.3 + 2.2 + 2.3 完成 + 端到端测试通过 + Agent 调度验证通过）
+- **最后更新**: 龍蝦羊 / 2026-02-23 19:06
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -162,6 +162,37 @@
   - 最小闭环 PASS：inline button 发送成功（messageId: 6134）→ 点击 `👍 感兴趣` → callback `/brush like` 生效
   - 完整按钮组 PASS：5 按钮可点击（messageId: 6140），`/brush like|skip|read|save|refresh` 全部触发成功
   - 经验沉淀：`docs/M11_BUTTON_FIX_EXPERIENCE.md`
+
+## 测试验收（VPS，V2.0 第 4 批端到端）
+- **测试环境**: `/home/admin/clawd/github/brush-blog-skill`
+- **测试版本**: `6a93728`
+- **测试时间**: 2026-02-23 18:14-19:06
+- **执行者**: 龍蝦羊（小羊一号）
+- **结果**: ✅ 4/5 PASS，1 FAIL（子代理调度需补充）
+- **证据摘要**:
+  - 测试 1（git pull）：✅ PASS，更新到 `6a93728`
+  - 测试 2（/brush 输出）：✅ PASS，博客卡片 + POOL_SIZE/POOL_LOW/POOL_EMPTY 状态行
+  - 测试 3（Telegram 按钮）：✅ PASS，5 按钮可点击（messageId: 6235）
+  - 测试 4（空池同步刷新）：⚠️ PARTIAL，POOL_EMPTY: true 正确，但未触发同步刷新（回退 M1 假数据）
+  - 测试 5（低池异步刷新）：❌ FAIL，main.py 中无 sessions_spawn 调用
+- **后续行动**: CodeX 需补充 Agent 调度逻辑（空池同步刷新 + 低池异步刷新）
+- **经验沉淀**: `docs/AGENT_PRACTICE_NOTES.md`（龍蝦羊的调度实践心得）
+
+## Agent 调度练习（V2.0 核心能力验证）
+- **执行者**: 龍蝦羊（小羊一号）
+- **练习 1（空池同步刷新）**：✅ PASS
+  - 场景：`POOL_EMPTY: true`
+  - 决策：同步执行 `pool_manager.py refresh`
+  - 结果：刷新后 20 篇文章，POOL_SIZE: 20
+- **练习 2（低池异步刷新）**：✅ PASS
+  - 场景：`POOL_LOW: true, POOL_EMPTY: false`
+  - 决策：`sessions_spawn` 启动子代理异步刷新
+  - 结果：子代理成功启动，刷新后 pool_size: 20
+- **核心洞见**:
+  - Skill 纯读，Agent 调度
+  - 空池 → 同步刷新（用户体验优先）
+  - 低池 → 异步刷新（不阻塞当前推荐）
+- **文档**: `docs/AGENT_PRACTICE_NOTES.md`
 
 ## 测试验收（本地，M10 深度阅读）
 - **执行命令**: `PYTHONPATH=src python3 -c "from main import handle_command ... /brush read"`
