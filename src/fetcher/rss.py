@@ -3,9 +3,9 @@ import hashlib
 import sqlite3
 import urllib.request
 import xml.etree.ElementTree as ET
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 from fetcher.cleaner import clean_text, summarize_text
 
@@ -263,6 +263,75 @@ def list_articles_from_pool(
     return candidates
 
 
+def list_articles_by_category(
+    db_path: Union[str, Path],
+    category: str,
+    exclude_item_keys: Optional[Sequence[str]] = None,
+    limit: int = 20,
+) -> List[Dict[str, Any]]:
+    """
+    List candidate articles filtered by category.
+    """
+    init_content_db(db_path)
+    path = str(db_path)
+    exclude = set(exclude_item_keys or [])
+
+    conn = sqlite3.connect(path)
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            """
+            SELECT item_key, link, title, summary, category, source, feed_name, feed_url, tags_json, fetched_at
+            FROM content_pool
+            WHERE category = ?
+            ORDER BY fetched_at DESC
+            LIMIT ?
+            """,
+            (category, max(1, int(limit))),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    candidates = []
+    for row in rows:
+        item_key = row["item_key"]
+        if item_key in exclude:
+            continue
+        candidates.append(_row_to_article(dict(row)))
+    return candidates
+
+
+def get_content_pool_stats(db_path: Union[str, Path]) -> Dict[str, Any]:
+    """
+    Return quick stats for refresh throttling decisions.
+    """
+    init_content_db(db_path)
+    path = str(db_path)
+    conn = sqlite3.connect(path)
+    try:
+        row = conn.execute(
+            """
+            SELECT COUNT(*) AS total_count, MAX(fetched_at) AS latest_fetched_at
+            FROM content_pool
+            """
+        ).fetchone()
+    finally:
+        conn.close()
+
+    total_count = int(row[0] if row and row[0] is not None else 0)
+    latest_raw = row[1] if row else None
+    latest_dt = _parse_iso_datetime(latest_raw)
+    age_seconds = None
+    if latest_dt is not None:
+        age_seconds = max(0, int((datetime.now(timezone.utc) - latest_dt).total_seconds()))
+
+    return {
+        "total_count": total_count,
+        "latest_fetched_at": latest_raw or "",
+        "age_seconds": age_seconds,
+    }
+
+
 def _first_text(node: ET.Element, tags: List[str]) -> Optional[str]:
     for tag in tags:
         child = node.find(tag)
@@ -340,3 +409,21 @@ def _row_to_article(row: Dict[str, Any]) -> Dict[str, Any]:
         "tags": tags,
         "fetched_at": row.get("fetched_at", ""),
     }
+
+
+def _parse_iso_datetime(value: Optional[str]) -> Optional[datetime]:
+    if not value:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    # Stored values use UTC suffix "Z".
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)

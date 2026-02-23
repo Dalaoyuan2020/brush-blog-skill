@@ -49,19 +49,26 @@ def build_cold_start_buttons() -> List[List[Dict[str, str]]]:
     ]
 
 
-def build_deep_read_message(item: Dict[str, Any]) -> str:
+def build_deep_read_message(
+    item: Dict[str, Any],
+    deep_read_summary: str = "",
+    deep_read_excerpt: str = "",
+) -> str:
     """Build expanded reading text for last recommended article."""
     title = item.get("title", "Untitled")
     summary = item.get("summary", "暂无摘要")
     source = item.get("source", "unknown")
     link = item.get("link", "")
+    explain = deep_read_summary.strip()
+    excerpt = deep_read_excerpt.strip()
 
-    message = (
-        "📖 深度阅读\n"
-        f"标题：{title}\n"
-        f"来源：{source}\n\n"
-        f"{summary}"
-    )
+    message = "📖 深度阅读\n标题：{0}\n来源：{1}\n\n".format(title, source)
+    if explain:
+        message += "🧠 大白话讲解\n{0}\n\n".format(explain)
+    else:
+        message += "{0}\n\n".format(summary)
+    if excerpt:
+        message += "📚 正文摘录\n{0}\n\n".format(excerpt)
     if link:
         message += "\n\n原文：{0}".format(link)
     return message
