@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -43,6 +44,7 @@ BEHAVIOR_EVENTS_FILE = ROOT_DIR / "data" / "behavior_events.jsonl"
 SAVED_NOTES_FILE = ROOT_DIR / "data" / "saved_notes.jsonl"
 READ_HISTORY_LIMIT = 100
 SHARED_READ_HISTORY_LIMIT = 300
+SHARED_READ_HISTORY_EXPIRE_HOURS = 24
 SAVED_ITEMS_LIMIT = 200
 SOURCE_HISTORY_LIMIT = 50
 COLD_START_MIN_SELECTIONS = 2
@@ -137,6 +139,7 @@ def _build_mock_item(feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
         "summary": "这是 M1 阶段的假数据卡片，用于打通 /brush 命令链路。",
         "tags": first_category.split("_"),
         "source": first_feed.get("site", "example.com"),
+        "url": "",
         "link": "",
     }
 
@@ -192,18 +195,72 @@ def _load_shared_content_pool() -> Dict[str, Any]:
     return data
 
 
-def _load_shared_read_history() -> List[str]:
+def _parse_iso_utc(value: str) -> Optional[datetime]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _normalize_history_entry(value: Any) -> Optional[Dict[str, str]]:
+    if isinstance(value, dict):
+        url = str(value.get("url", "") or "").strip()
+        read_at = str(value.get("read_at", "") or "").strip()
+    elif isinstance(value, str):
+        # 兼容旧格式（字符串列表），无法确认是否 URL，按 URL 兜底读入。
+        url = value.strip()
+        read_at = ""
+    else:
+        return None
+    if not url:
+        return None
+    if not read_at:
+        read_at = datetime.now(timezone.utc).isoformat()
+    if _parse_iso_utc(read_at) is None:
+        return None
+    return {"url": url, "read_at": read_at}
+
+
+def _load_shared_read_history() -> List[Dict[str, str]]:
     data = _read_json_file(SHARED_READ_HISTORY_FILE, [])
     if not isinstance(data, list):
-        return []
-    history: List[str] = []
+        data = []
+    now = datetime.now(timezone.utc)
+    expires_before = now - timedelta(hours=SHARED_READ_HISTORY_EXPIRE_HOURS)
+
+    normalized: List[Dict[str, str]] = []
     for value in data:
-        if not isinstance(value, str):
+        entry = _normalize_history_entry(value)
+        if not entry:
             continue
-        item_key = value.strip()
-        if item_key:
-            history.append(item_key)
-    return history
+        read_at_dt = _parse_iso_utc(entry["read_at"])
+        if read_at_dt is None:
+            continue
+        if read_at_dt < expires_before:
+            continue
+        normalized.append(entry)
+
+    # 历史记录做去重（URL）并限制最大长度。
+    deduped: List[Dict[str, str]] = []
+    seen_urls = set()
+    for entry in reversed(normalized):
+        url = entry["url"]
+        if url in seen_urls:
+            continue
+        seen_urls.add(url)
+        deduped.append(entry)
+        if len(deduped) >= SHARED_READ_HISTORY_LIMIT:
+            break
+    deduped.reverse()
+    return deduped
 
 
 def _load_shared_user_prefs() -> Dict[str, Any]:
@@ -223,7 +280,7 @@ def _load_shared_user_prefs() -> Dict[str, Any]:
     return data
 
 
-def _save_shared_read_history(history: List[str]) -> None:
+def _save_shared_read_history(history: List[Dict[str, str]]) -> None:
     _write_json_file(SHARED_READ_HISTORY_FILE, history)
 
 
@@ -267,6 +324,7 @@ def _normalize_pool_article(article: Dict[str, Any]) -> Dict[str, Any]:
         "item_key": _item_key_from_article(article),
         "title": str(article.get("title", "Untitled") or "Untitled").strip(),
         "summary": str(article.get("summary", "暂无摘要") or "暂无摘要").strip(),
+        "url": link,
         "link": link,
         "source": str(article.get("source", "unknown") or "unknown").strip(),
         "tags": tags,
@@ -274,19 +332,21 @@ def _normalize_pool_article(article: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _record_shared_read_history(item_key: str) -> None:
-    if not item_key:
+def _record_shared_read_history(item_url: str) -> None:
+    item_url = str(item_url or "").strip()
+    if not item_url:
         return
     history = _load_shared_read_history()
-    history = [value for value in history if value != item_key]
-    history.append(item_key)
+    history = [value for value in history if value.get("url", "") != item_url]
+    history.append({"url": item_url, "read_at": datetime.now(timezone.utc).isoformat()})
     history = history[-SHARED_READ_HISTORY_LIMIT:]
     _save_shared_read_history(history)
 
 
-def _append_pool_status(message: str, pool_low: bool, pool_empty: bool) -> str:
-    return "{0}\nPOOL_LOW: {1}\nPOOL_EMPTY: {2}".format(
+def _append_pool_status(message: str, pool_size: int, pool_low: bool, pool_empty: bool) -> str:
+    return "{0}\nPOOL_SIZE: {1}\nPOOL_LOW: {2}\nPOOL_EMPTY: {3}".format(
         message,
+        max(0, int(pool_size)),
         "true" if pool_low else "false",
         "true" if pool_empty else "false",
     )
@@ -326,6 +386,8 @@ def _build_recommended_item(
 
     if not candidates:
         card_item["item_key"] = ""
+        card_item["url"] = ""
+        card_item["_pool_size"] = pool_size
         card_item["_pool_low"] = pool_low
         card_item["_pool_empty"] = pool_empty
         return card_item
@@ -334,11 +396,27 @@ def _build_recommended_item(
     profile_history = profile.get("read_history", [])
     if not isinstance(profile_history, list):
         profile_history = []
-    exclude_keys = set(shared_history + [str(value) for value in profile_history if isinstance(value, str)])
+    read_urls = set()
+    for entry in shared_history:
+        if not isinstance(entry, dict):
+            continue
+        url = str(entry.get("url", "") or "").strip()
+        if url:
+            read_urls.add(url)
 
-    filtered = [item for item in candidates if item.get("item_key", "") not in exclude_keys]
+    profile_keys = set(str(value) for value in profile_history if isinstance(value, str))
+    filtered = [
+        item
+        for item in candidates
+        if item.get("url", "") not in read_urls and item.get("item_key", "") not in profile_keys
+    ]
     if not filtered:
-        filtered = candidates
+        card_item["item_key"] = ""
+        card_item["url"] = ""
+        card_item["_pool_size"] = pool_size
+        card_item["_pool_low"] = pool_low
+        card_item["_pool_empty"] = pool_empty
+        return card_item
 
     shared_prefs = _load_shared_user_prefs()
     rank_profile = dict(profile)
@@ -362,8 +440,10 @@ def _build_recommended_item(
             "summary": top_article.get("summary", card_item["summary"]),
             "tags": top_article.get("tags", card_item["tags"]),
             "source": top_article.get("source", card_item["source"]),
+            "url": top_article.get("url", top_article.get("link", "")),
             "link": top_article.get("link", ""),
             "item_key": top_article.get("item_key", ""),
+            "_pool_size": pool_size,
             "_pool_low": pool_low,
             "_pool_empty": pool_empty,
         }
@@ -968,11 +1048,12 @@ def _next_item_response(
     learning = _ensure_learning_state(profile)
     weights = _resolve_recommend_weights(profile)
     card_item = _build_recommended_item(feeds, profile=profile, weights=weights)
+    pool_size = int(card_item.pop("_pool_size", 0) or 0)
     pool_low = bool(card_item.pop("_pool_low", False))
     pool_empty = bool(card_item.pop("_pool_empty", False))
     profile["last_item"] = card_item
     profile = _record_read_history(profile, card_item.get("item_key", ""))
-    _record_shared_read_history(card_item.get("item_key", ""))
+    _record_shared_read_history(card_item.get("url", card_item.get("link", "")))
     profile = _record_source_history(profile, card_item.get("source", ""))
 
     quick_hint = ""
@@ -1014,7 +1095,12 @@ def _next_item_response(
     if quick_hint:
         response["message"] = quick_hint + response["message"]
     if include_pool_status:
-        response["message"] = _append_pool_status(response["message"], pool_low=pool_low, pool_empty=pool_empty)
+        response["message"] = _append_pool_status(
+            response["message"],
+            pool_size=pool_size,
+            pool_low=pool_low,
+            pool_empty=pool_empty,
+        )
     return response
 
 

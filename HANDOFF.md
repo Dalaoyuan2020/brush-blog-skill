@@ -5,9 +5,9 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → ✅ M11 完成 → ✅ M12 完成（VPS 验收通过）→ 🚧 V2.0 执行中（任务 1.1、2.1 已完成）
-- **进度**: v1.0 阶段进度 100%；V2.0 当前进度 2/12（任务 1.1 + 2.1 完成）
-- **最后更新**: Codex / 2026-02-23 16:27
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → ✅ M11 完成 → ✅ M12 完成（VPS 验收通过）→ 🚧 V2.0 执行中（任务 1.1、2.1、1.2、1.4、1.3 已完成）
+- **进度**: v1.0 阶段进度 100%；V2.0 当前进度 5/12（任务 1.1 + 2.1 + 1.2 + 1.4 + 1.3 完成）
+- **最后更新**: Codex / 2026-02-23 17:12
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
@@ -123,6 +123,11 @@
 - 2026-02-23 16:20 / Codex：完成 V2.0 `任务 1.1`：创建 `shared/` 目录与三个共享数据文件（`shared/content_pool.json`、`shared/read_history.json`、`shared/user_prefs.json`），并通过 `python3` JSON 解析校验。
 - 2026-02-23 16:27 / Codex：完成 V2.0 `任务 2.1`：`src/main.py` 的 `/brush` 改为纯读模式（仅读取 `shared/content_pool.json` + `shared/read_history.json`，不再触发 `refresh_content_pool()` 同步刷新）；输出追加 `POOL_LOW`/`POOL_EMPTY` 状态行供 Agent 调度。
 - 2026-02-23 16:27 / Codex：V2.0 任务 2.1 验收通过：`/usr/bin/time -p python3 src/main.py /brush` 实测 `real 0.15s`（<1s），输出合法卡片文本且包含 `POOL_LOW: true`、`POOL_EMPTY: true`。
+- 2026-02-23 17:02 / Codex：完成 V2.0 `任务 1.2`：新增 `src/pool_manager.py` 与 `refresh_pool()`，支持遍历 `data/feeds.json` 抓取 RSS、URL 去重、写入 `shared/content_pool.json`，并在池子达到 `20` 篇时停止抓取（保留最少 `10` 篇回填策略）。
+- 2026-02-23 17:10 / Codex：完成 V2.0 `任务 1.4`：`shared/read_history.json` 改为 `[{url, read_at}]` 结构；推荐时按 URL 排除 24 小时内已读，并在每次推荐后写入 URL + 时间戳。
+- 2026-02-23 17:12 / Codex：完成 V2.0 `任务 1.3`：`/brush` 输出状态行扩展为 `POOL_SIZE: N`、`POOL_LOW: true/false`、`POOL_EMPTY: true/false`，供 Agent 精准调度补货。
+- 2026-02-23 17:15 / Codex：第 2 批验收命令通过：`python3 src/pool_manager.py refresh` 结果池子 `20` 篇且 URL 去重为 `True`；`echo '{\"articles\":[]}' > shared/content_pool.json` 后 `/brush` 正确输出 `POOL_SIZE: 0`、`POOL_EMPTY: true`。
+- 2026-02-23 17:17 / Codex：补充验证 `任务 1.4`：清空历史后连续执行 `/brush` 10 次，标题唯一数 `10`（24h 已读去重生效）。
 
 ## 测试验收（本地，M12 冷启动兴趣选择）
 - **执行命令**: `python3 -m py_compile src/main.py src/interaction/telegram.py scripts/m8_smoke_test.py`
