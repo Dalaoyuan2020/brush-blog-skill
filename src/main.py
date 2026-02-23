@@ -44,7 +44,15 @@ READ_HISTORY_LIMIT = 100
 SAVED_ITEMS_LIMIT = 200
 SOURCE_HISTORY_LIMIT = 50
 COLD_START_MIN_SELECTIONS = 2
+COLD_START_MAX_SELECTIONS = 3
 COLD_START_MAX_CATEGORIES = 6
+QUICK_LEARN_REBALANCE_INTERVAL = 5
+BASE_RECOMMEND_WEIGHTS = {
+    "interest": 0.4,
+    "knowledge": 0.3,
+    "diversity": 0.2,
+    "popularity": 0.1,
+}
 COLD_START_CATEGORY_ORDER = [
     "tech_programming",
     "ai_ml",
@@ -69,6 +77,17 @@ COLD_START_CATEGORY_ALIASES = {
     "science_general": "science",
     "priority_hn_popular_2025": "popular",
 }
+COLD_START_CATEGORY_TAG_HINTS = {
+    "tech_programming": ["tech", "programming", "engineering", "backend"],
+    "ai_ml": ["ai", "ml", "llm", "agent"],
+    "business_startup": ["business", "startup", "growth", "product"],
+    "design_product": ["design", "ux", "ui", "product"],
+    "science_general": ["science", "research", "biology", "physics"],
+    "priority_hn_popular_2025": ["hn", "popular", "trend", "tech"],
+}
+COLD_START_ALIAS_TO_CATEGORY = {
+    alias: category for category, alias in COLD_START_CATEGORY_ALIASES.items()
+}
 
 
 def _env_int(name: str, default: int, min_value: int = 1) -> int:
@@ -84,6 +103,21 @@ def _env_int(name: str, default: int, min_value: int = 1) -> int:
     return value
 
 
+def _env_float(name: str, default: float, min_value: float = 0.0, max_value: float = 1.0) -> float:
+    raw = os.getenv(name, "")
+    if not raw:
+        return default
+    try:
+        value = float(raw)
+    except Exception:
+        return default
+    if value < min_value:
+        return min_value
+    if value > max_value:
+        return max_value
+    return value
+
+
 POOL_MIN_ITEMS = _env_int("BRUSH_POOL_MIN_ITEMS", 4)
 POOL_REFRESH_MIN_INTERVAL_SECONDS = _env_int("BRUSH_POOL_REFRESH_INTERVAL_SEC", 20 * 60)
 POOL_REFRESH_TIMEOUT_SECONDS = _env_int("BRUSH_POOL_REFRESH_TIMEOUT_SEC", 4)
@@ -91,6 +125,8 @@ POOL_REFRESH_MAX_ITEMS = _env_int("BRUSH_POOL_REFRESH_MAX_ITEMS", 4)
 POOL_REFRESH_PER_CATEGORY_LIMIT = _env_int("BRUSH_POOL_REFRESH_PER_CATEGORY", 1)
 FALLBACK_FETCH_TIMEOUT_SECONDS = _env_int("BRUSH_FALLBACK_FETCH_TIMEOUT_SEC", 4)
 DEEP_READ_FETCH_TIMEOUT_SECONDS = _env_int("BRUSH_DEEP_READ_TIMEOUT_SEC", 6)
+QUICK_LEARN_INTERACTIONS = _env_int("BRUSH_QUICK_LEARN_INTERACTIONS", 20)
+QUICK_LEARN_DIVERSITY_WEIGHT = _env_float("BRUSH_QUICK_LEARN_DIVERSITY_WEIGHT", 0.4)
 _FEEDS_CACHE: Dict[str, Any] = {"mtime": None, "data": None}
 
 
@@ -164,7 +200,11 @@ def _maybe_refresh_content_pool(feeds: Dict[str, List[Dict[str, Any]]]) -> None:
         return
 
 
-def _build_recommended_item(feeds: Dict[str, List[Dict[str, Any]]], profile: Dict[str, Any]) -> Dict[str, Any]:
+def _build_recommended_item(
+    feeds: Dict[str, List[Dict[str, Any]]],
+    profile: Dict[str, Any],
+    weights: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
     """
     Build one recommended card item from content pool with live fallback.
     """
@@ -190,12 +230,7 @@ def _build_recommended_item(feeds: Dict[str, List[Dict[str, Any]]], profile: Dic
                 recent_sources=profile.get("source_history", [])
                 if isinstance(profile.get("source_history", []), list)
                 else [],
-                weights={
-                    "interest": 0.4,
-                    "knowledge": 0.3,
-                    "diversity": 0.2,
-                    "popularity": 0.1,
-                },
+                weights=weights or BASE_RECOMMEND_WEIGHTS,
             )
             pooled_article = ranked[0]
         else:
@@ -268,6 +303,12 @@ def _default_profile() -> Dict[str, Any]:
         "source_history": [],
         "saved_items": [],
         "last_item": {},
+        "learning": {
+            "phase": "cold_start",
+            "interaction_count": 0,
+            "quick_limit": QUICK_LEARN_INTERACTIONS,
+            "last_rebalanced_at": 0,
+        },
         "cold_start": {
             "active": True,
             "completed": False,
@@ -343,6 +384,116 @@ def _update_interest_tags(profile: Dict[str, Any], tags: List[str], delta: int) 
     return profile
 
 
+def _recalibrate_interest_tags(profile: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Light rebalance for quick-learning phase:
+    keep strong tags and suppress noisy weak signals.
+    """
+    interest = profile.get("interest_tags", {})
+    if not isinstance(interest, dict) or not interest:
+        return profile
+
+    rebalanced: Dict[str, float] = {}
+    for tag, value in interest.items():
+        try:
+            numeric = float(value)
+        except Exception:
+            continue
+        adjusted = round(numeric * 0.95, 3)
+        if adjusted >= 0.15 or adjusted <= -0.15:
+            rebalanced[tag] = adjusted
+
+    profile["interest_tags"] = rebalanced
+    return profile
+
+
+def _ensure_learning_state(profile: Dict[str, Any]) -> Dict[str, Any]:
+    state = profile.get("learning", {})
+    if not isinstance(state, dict):
+        state = {}
+
+    phase = state.get("phase", "")
+    interaction_count = state.get("interaction_count", 0)
+    quick_limit = state.get("quick_limit", QUICK_LEARN_INTERACTIONS)
+    last_rebalanced_at = state.get("last_rebalanced_at", 0)
+
+    try:
+        interaction_count = max(0, int(interaction_count))
+    except Exception:
+        interaction_count = 0
+    try:
+        quick_limit = max(1, int(quick_limit))
+    except Exception:
+        quick_limit = QUICK_LEARN_INTERACTIONS
+    try:
+        last_rebalanced_at = max(0, int(last_rebalanced_at))
+    except Exception:
+        last_rebalanced_at = 0
+
+    if phase not in ("cold_start", "quick", "stable"):
+        cold_state = _ensure_cold_start_state(profile)
+        if bool(cold_state.get("active", False)) and not bool(cold_state.get("completed", False)):
+            phase = "cold_start"
+        else:
+            # Keep existing users in stable mode by default to avoid changing their experience.
+            phase = "stable"
+
+    normalized = {
+        "phase": phase,
+        "interaction_count": interaction_count,
+        "quick_limit": quick_limit,
+        "last_rebalanced_at": last_rebalanced_at,
+    }
+    profile["learning"] = normalized
+    return normalized
+
+
+def _activate_quick_learning(profile: Dict[str, Any]) -> Dict[str, Any]:
+    state = _ensure_learning_state(profile)
+    state["phase"] = "quick"
+    state["interaction_count"] = 0
+    state["quick_limit"] = QUICK_LEARN_INTERACTIONS
+    state["last_rebalanced_at"] = 0
+    profile["learning"] = state
+    return state
+
+
+def _category_interest_tags(category: str) -> List[str]:
+    tags = []
+    for tag in category.split("_"):
+        if tag and tag not in tags:
+            tags.append(tag)
+    alias = COLD_START_CATEGORY_ALIASES.get(category, "")
+    if alias and alias not in tags:
+        tags.append(alias)
+    for tag in COLD_START_CATEGORY_TAG_HINTS.get(category, []):
+        if tag and tag not in tags:
+            tags.append(tag)
+    return tags
+
+
+def _resolve_recommend_weights(profile: Dict[str, Any]) -> Dict[str, float]:
+    learning = _ensure_learning_state(profile)
+    if learning.get("phase") != "quick":
+        return dict(BASE_RECOMMEND_WEIGHTS)
+
+    diversity = QUICK_LEARN_DIVERSITY_WEIGHT
+    remaining = max(0.0, 1.0 - diversity)
+    ratio_total = BASE_RECOMMEND_WEIGHTS["interest"] + BASE_RECOMMEND_WEIGHTS["knowledge"] + BASE_RECOMMEND_WEIGHTS["popularity"]
+    if ratio_total <= 0:
+        return dict(BASE_RECOMMEND_WEIGHTS)
+
+    interest = round(remaining * (BASE_RECOMMEND_WEIGHTS["interest"] / ratio_total), 4)
+    knowledge = round(remaining * (BASE_RECOMMEND_WEIGHTS["knowledge"] / ratio_total), 4)
+    popularity = round(max(0.0, 1.0 - diversity - interest - knowledge), 4)
+    return {
+        "interest": interest,
+        "knowledge": knowledge,
+        "diversity": round(diversity, 4),
+        "popularity": popularity,
+    }
+
+
 def _build_card_message(item: Dict[str, Any]) -> str:
     message = build_brush_card(item)
     if item.get("link"):
@@ -381,6 +532,14 @@ def _ensure_cold_start_state(profile: Dict[str, Any]) -> Dict[str, Any]:
         selected_categories = []
     if not isinstance(seen_categories, list):
         seen_categories = []
+    normalized_selected: List[str] = []
+    for category in selected_categories:
+        if not isinstance(category, str):
+            continue
+        category = category.strip()
+        if category in COLD_START_CATEGORY_ALIASES and category not in normalized_selected:
+            normalized_selected.append(category)
+    selected_categories = normalized_selected[:COLD_START_MAX_SELECTIONS]
 
     try:
         current_index = int(current_index)
@@ -476,6 +635,20 @@ def _current_seed_item(profile: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return seed_items[current_index]
 
 
+def _selected_categories_text(selected_categories: List[str]) -> str:
+    selected_text = "、".join(COLD_START_CATEGORY_LABELS.get(category, category) for category in selected_categories[-6:])
+    if not selected_text:
+        return "暂无"
+    return selected_text
+
+
+def _cold_start_action_buttons(profile: Dict[str, Any]) -> List[List[Dict[str, str]]]:
+    state = _ensure_cold_start_state(profile)
+    selected_count = len(state.get("selected_categories", []))
+    ready_to_start = selected_count >= COLD_START_MIN_SELECTIONS
+    return build_cold_start_buttons(selected_count=selected_count, ready_to_start=ready_to_start)
+
+
 def _cold_start_header(profile: Dict[str, Any], item: Dict[str, Any]) -> str:
     state = _ensure_cold_start_state(profile)
     selected_categories = state.get("selected_categories", [])
@@ -484,25 +657,29 @@ def _cold_start_header(profile: Dict[str, Any], item: Dict[str, Any]) -> str:
     total = len(state.get("seed_items", []))
     label = item.get("cold_start_label", COLD_START_CATEGORY_LABELS.get(item.get("category", ""), "未分类"))
     alias = item.get("cold_start_alias", COLD_START_CATEGORY_ALIASES.get(item.get("category", ""), "unknown"))
-    selected_text = "、".join(
-        COLD_START_CATEGORY_LABELS.get(category, category) for category in selected_categories[-6:]
-    )
-    if not selected_text:
-        selected_text = "暂无"
+    selected_text = _selected_categories_text(selected_categories)
+    if selected_count < COLD_START_MIN_SELECTIONS:
+        hint = "请先选满 2 个感兴趣领域（可点分类按钮，或对当前领域点 👍）。"
+    elif selected_count < COLD_START_MAX_SELECTIONS:
+        hint = "已满足最少 2 类，可点击 ✅ 开始推荐，或再补选 1 个领域。"
+    else:
+        hint = "已选满 3 类，正在进入智能推荐。"
 
     return (
         "👋 欢迎来到刷博客！我先推几篇不同领域的内容，帮你快速建立口味画像。\n"
-        "冷启动进度：已选 {0}/{1} 个感兴趣领域（第 {2}/{3} 个领域）\n"
-        "当前领域：{4}（{5}）\n"
-        "已选领域：{6}\n"
-        "操作提示：点 👍 选择该领域；选满 2 个后将自动进入智能推荐。\n\n".format(
+        "冷启动进度：已选 {0}/{1}-{2} 个感兴趣领域（第 {3}/{4} 个领域）\n"
+        "当前领域：{5}（{6}）\n"
+        "已选领域：{7}\n"
+        "操作提示：{8}\n\n".format(
             selected_count,
             COLD_START_MIN_SELECTIONS,
+            COLD_START_MAX_SELECTIONS,
             index,
             max(1, total),
             label,
             alias,
             selected_text,
+            hint,
         )
     )
 
@@ -526,8 +703,110 @@ def _cold_start_response(user_id: str, profile: Dict[str, Any], feeds: Dict[str,
 
     return {
         "message": _cold_start_header(profile, item) + _build_card_message(item),
-        "buttons": build_cold_start_buttons(),
+        "buttons": _cold_start_action_buttons(profile),
     }
+
+
+def _complete_cold_start(
+    user_id: str,
+    profile: Dict[str, Any],
+    feeds: Dict[str, List[Dict[str, Any]]],
+    trigger: str,
+    item: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    state = _ensure_cold_start_state(profile)
+    selected_categories = list(state.get("selected_categories", []))
+    state["active"] = False
+    state["completed"] = True
+    state["seed_items"] = []
+    state["current_index"] = 0
+
+    _activate_quick_learning(profile)
+    _save_profile(user_id, profile)
+    _safe_log_event(
+        user_id,
+        "cold_start_complete",
+        item or profile.get("last_item", {}),
+        metadata={"selected_categories": selected_categories, "trigger": trigger},
+    )
+    response = _next_item_response(user_id, profile, feeds)
+    response["message"] = "✅ 冷启动完成，已进入智能推荐。\n已选领域：{0}\n\n{1}".format(
+        _selected_categories_text(selected_categories),
+        response["message"],
+    )
+    return response
+
+
+def _choose_cold_start_category(
+    user_id: str,
+    profile: Dict[str, Any],
+    feeds: Dict[str, List[Dict[str, Any]]],
+    alias: str,
+) -> Dict[str, Any]:
+    normalized_alias = alias.strip().lower()
+    category = COLD_START_ALIAS_TO_CATEGORY.get(normalized_alias, "")
+    if not category:
+        return {
+            "message": "未识别的兴趣标签：{0}。可选：tech/ai/biz/design/science/popular".format(normalized_alias),
+            "buttons": _cold_start_action_buttons(profile),
+        }
+
+    state = _ensure_cold_start_state(profile)
+    selected = state.get("selected_categories", [])
+    if category in selected:
+        response = _cold_start_response(user_id, profile, feeds)
+        response["message"] = "✅ 领域“{0}”已在已选列表中。\n\n{1}".format(
+            COLD_START_CATEGORY_LABELS.get(category, category),
+            response["message"],
+        )
+        return response
+
+    if len(selected) >= COLD_START_MAX_SELECTIONS:
+        return _complete_cold_start(
+            user_id=user_id,
+            profile=profile,
+            feeds=feeds,
+            trigger="choose_limit_reached",
+        )
+
+    selected.append(category)
+    state["selected_categories"] = selected[:COLD_START_MAX_SELECTIONS]
+    profile = _update_interest_tags(profile, _category_interest_tags(category), 4)
+
+    # Move cursor to the selected category card, so next like/skip remains intuitive.
+    for idx, seed in enumerate(state.get("seed_items", [])):
+        if isinstance(seed, dict) and seed.get("category") == category:
+            state["current_index"] = idx
+            break
+
+    _safe_log_event(
+        user_id,
+        "cold_start_choose",
+        profile.get("last_item", {}),
+        metadata={"alias": normalized_alias, "category": category, "selected_categories": list(state["selected_categories"])},
+    )
+
+    if len(state.get("selected_categories", [])) >= COLD_START_MAX_SELECTIONS:
+        return _complete_cold_start(
+            user_id=user_id,
+            profile=profile,
+            feeds=feeds,
+            trigger="choose_max_selected",
+        )
+
+    _save_profile(user_id, profile)
+    response = _cold_start_response(user_id, profile, feeds)
+    if len(state.get("selected_categories", [])) >= COLD_START_MIN_SELECTIONS:
+        response["message"] = "✅ 已选择领域：{0}。你已满足最少 2 类，可点 ✅ 开始推荐。\n\n{1}".format(
+            COLD_START_CATEGORY_LABELS.get(category, category),
+            response["message"],
+        )
+    else:
+        response["message"] = "✅ 已选择领域：{0}，继续再选至少 1 类。\n\n{1}".format(
+            COLD_START_CATEGORY_LABELS.get(category, category),
+            response["message"],
+        )
+    return response
 
 
 def _advance_cold_start(
@@ -543,10 +822,10 @@ def _advance_cold_start(
 
     if action == "like" and category:
         selected = state.get("selected_categories", [])
-        if category not in selected:
+        if category not in selected and len(selected) < COLD_START_MAX_SELECTIONS:
             selected.append(category)
-        state["selected_categories"] = selected
-        profile = _update_interest_tags(profile, item.get("tags", []) if isinstance(item.get("tags", []), list) else [], 3)
+        state["selected_categories"] = selected[:COLD_START_MAX_SELECTIONS]
+        profile = _update_interest_tags(profile, _category_interest_tags(category), 3)
         _safe_log_event(
             user_id,
             "cold_start_like",
@@ -565,40 +844,76 @@ def _advance_cold_start(
     if total > 0:
         state["current_index"] = (int(state.get("current_index", 0)) + 1) % total
 
-    if len(state.get("selected_categories", [])) >= COLD_START_MIN_SELECTIONS:
-        state["active"] = False
-        state["completed"] = True
-        state["seed_items"] = []
-        state["current_index"] = 0
-        _save_profile(user_id, profile)
-        _safe_log_event(
-            user_id,
-            "cold_start_complete",
-            item,
-            metadata={"selected_categories": state.get("selected_categories", [])},
+    selected_count = len(state.get("selected_categories", []))
+    if selected_count >= COLD_START_MAX_SELECTIONS:
+        response = _complete_cold_start(
+            user_id=user_id,
+            profile=profile,
+            feeds=feeds,
+            trigger="like_max_selected",
+            item=item,
         )
-        response = _next_item_response(user_id, profile, feeds)
-        response["message"] = "✅ 冷启动完成，已进入智能推荐。\n\n" + response["message"]
         return response
 
     _save_profile(user_id, profile)
     response = _cold_start_response(user_id, profile, feeds)
     if action == "like":
-        response["message"] = "✅ 已记录该领域偏好（+3）\n\n" + response["message"]
+        if selected_count >= COLD_START_MIN_SELECTIONS:
+            response["message"] = "✅ 已记录该领域偏好（+3），已可点击 ✅ 开始推荐。\n\n" + response["message"]
+        else:
+            response["message"] = "✅ 已记录该领域偏好（+3）\n\n" + response["message"]
     else:
         response["message"] = "⏭️ 已切换到下一个领域\n\n" + response["message"]
     return response
 
 
 def _next_item_response(user_id: str, profile: Dict[str, Any], feeds: Dict[str, List[Dict[str, Any]]]) -> Dict[str, Any]:
-    card_item = _build_recommended_item(feeds, profile=profile)
+    learning = _ensure_learning_state(profile)
+    weights = _resolve_recommend_weights(profile)
+    card_item = _build_recommended_item(feeds, profile=profile, weights=weights)
     profile["last_item"] = card_item
     profile = _record_read_history(profile, card_item.get("item_key", ""))
     profile = _record_source_history(profile, card_item.get("source", ""))
-    _save_profile(user_id, profile)
-    _safe_log_event(user_id, "view", card_item)
 
-    return _build_brush_response(card_item)
+    quick_hint = ""
+    if learning.get("phase") == "quick":
+        learning["interaction_count"] = int(learning.get("interaction_count", 0)) + 1
+        current_count = int(learning["interaction_count"])
+        quick_limit = int(learning.get("quick_limit", QUICK_LEARN_INTERACTIONS))
+
+        if current_count % QUICK_LEARN_REBALANCE_INTERVAL == 0 and current_count > int(learning.get("last_rebalanced_at", 0)):
+            profile = _recalibrate_interest_tags(profile)
+            learning["last_rebalanced_at"] = current_count
+            _safe_log_event(
+                user_id,
+                "quick_learn_rebalance",
+                card_item,
+                metadata={"interaction_count": current_count},
+            )
+
+        if current_count >= quick_limit:
+            learning["phase"] = "stable"
+            quick_hint = "🎯 已进入稳定推荐模式。\n\n"
+        else:
+            quick_hint = "🧪 还在了解你的口味...（学习期 {0}/{1}）\n\n".format(current_count, quick_limit)
+
+    profile["learning"] = learning
+    _save_profile(user_id, profile)
+    _safe_log_event(
+        user_id,
+        "view",
+        card_item,
+        metadata={
+            "learning_phase": learning.get("phase", ""),
+            "learning_interaction_count": learning.get("interaction_count", 0),
+            "recommend_weights": weights,
+        },
+    )
+
+    response = _build_brush_response(card_item)
+    if quick_hint:
+        response["message"] = quick_hint + response["message"]
+    return response
 
 
 def _merge_command_and_args(command: str, args: List[str]) -> str:
@@ -733,6 +1048,7 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
     command = _merge_command_and_args(command, args)
     profile = _load_profile(user_id) or _default_profile()
     _ensure_cold_start_state(profile)
+    _ensure_learning_state(profile)
 
     # 主命令：开始刷博客
     if command == "/brush":
@@ -740,6 +1056,40 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
         if _is_cold_start_active(profile):
             return _cold_start_response(user_id, profile, feeds)
         return _next_item_response(user_id, profile, feeds)
+
+    elif command.startswith("/brush choose"):
+        feeds = _load_feeds_cached()
+        if not _is_cold_start_active(profile):
+            return {"message": "冷启动已完成，直接用 /brush 刷推荐即可。", "buttons": build_brush_buttons()}
+        parts = command.split()
+        alias = parts[2].strip().lower() if len(parts) >= 3 else ""
+        if not alias:
+            return {
+                "message": "请指定兴趣标签：tech/ai/biz/design/science/popular",
+                "buttons": _cold_start_action_buttons(profile),
+            }
+        return _choose_cold_start_category(user_id, profile, feeds, alias)
+
+    elif command == "/brush start":
+        feeds = _load_feeds_cached()
+        if not _is_cold_start_active(profile):
+            return {"message": "你已在智能推荐模式，直接使用 /brush 即可。", "buttons": build_brush_buttons()}
+        state = _ensure_cold_start_state(profile)
+        selected_count = len(state.get("selected_categories", []))
+        if selected_count < COLD_START_MIN_SELECTIONS:
+            response = _cold_start_response(user_id, profile, feeds)
+            response["message"] = "还差 {0} 个兴趣领域，先完成选择再开始推荐。\n\n{1}".format(
+                COLD_START_MIN_SELECTIONS - selected_count,
+                response["message"],
+            )
+            return response
+        return _complete_cold_start(
+            user_id=user_id,
+            profile=profile,
+            feeds=feeds,
+            trigger="manual_start",
+            item=profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {},
+        )
     
     # 按钮回调处理
     elif command == "/brush like":
@@ -769,7 +1119,7 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
         return response
     
     elif command == "/brush read":
-        action_buttons = build_cold_start_buttons() if _is_cold_start_active(profile) else build_brush_buttons()
+        action_buttons = _cold_start_action_buttons(profile) if _is_cold_start_active(profile) else build_brush_buttons()
         last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
         if not last_item:
             _safe_log_event(user_id, "read_miss", metadata={"reason": "no_last_item"})
@@ -790,7 +1140,7 @@ def handle_command(command: str, args: List[str], user_id: str, context: Dict[st
             _safe_log_event(user_id, "cold_start_save_blocked", metadata={"reason": "cold_start_not_completed"})
             return {
                 "message": "冷启动进行中，请先用 👍 选择至少 2 个感兴趣领域，再使用收藏。",
-                "buttons": build_cold_start_buttons(),
+                "buttons": _cold_start_action_buttons(profile),
             }
         last_item = profile.get("last_item", {}) if isinstance(profile.get("last_item", {}), dict) else {}
         if not last_item:

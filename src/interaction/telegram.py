@@ -35,16 +35,32 @@ def build_brush_buttons() -> List[List[Dict[str, str]]]:
     ]
 
 
-def build_cold_start_buttons() -> List[List[Dict[str, str]]]:
+def build_cold_start_buttons(selected_count: int = 0, ready_to_start: bool = False) -> List[List[Dict[str, str]]]:
     """Return buttons used in cold-start onboarding flow."""
+    start_text = "✅ 开始推荐" if ready_to_start else "✅ 选满2类后开始"
     return [
         [
-            {"text": "👍 这个领域感兴趣", "callback_data": "/brush like"},
+            {"text": "👍 当前领域感兴趣", "callback_data": "/brush like"},
             {"text": "👎 下一个领域", "callback_data": "/brush skip"},
+        ],
+        [
+            {"text": "💻 技术", "callback_data": "/brush choose tech"},
+            {"text": "🧠 AI", "callback_data": "/brush choose ai"},
+        ],
+        [
+            {"text": "💰 商业", "callback_data": "/brush choose biz"},
+            {"text": "🎨 设计", "callback_data": "/brush choose design"},
+        ],
+        [
+            {"text": "🌍 科学", "callback_data": "/brush choose science"},
+            {"text": "🔥 热门", "callback_data": "/brush choose popular"},
         ],
         [
             {"text": "📖 先读这篇", "callback_data": "/brush read"},
             {"text": "🔄 换个领域", "callback_data": "/brush refresh"},
+        ],
+        [
+            {"text": start_text, "callback_data": "/brush start"},
         ],
     ]
 

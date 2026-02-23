@@ -29,6 +29,8 @@
    python3 src/main.py /brush read
    python3 src/main.py /brush save
    python3 src/main.py /brush refresh
+   python3 src/main.py /brush choose ai
+   python3 src/main.py /brush start
    ```
 2. 预期输出包含：
    - `📰 博客卡片`
@@ -43,7 +45,7 @@
    tail -n 5 data/behavior_events.jsonl
    tail -n 3 data/saved_notes.jsonl
    ```
-   - `behavior_events.jsonl` 包含 `view/like/read/save/refresh` 等事件
+   - `behavior_events.jsonl` 包含 `view/like/read/save/refresh` 及冷启动 `cold_start_choose/cold_start_complete` 事件
    - `saved_notes.jsonl` 至少新增 1 条结构化笔记（title/summary/tags/source_url）
 5. 回退验证（可选）：
    - 断网或故意改错首条 RSS URL 后重跑
@@ -53,14 +55,15 @@
 1. 使用全新用户（或删除对应 profile 文件）后执行：
    ```bash
    python3 src/main.py /brush
-   python3 src/main.py /brush like
-   python3 src/main.py /brush skip
-   python3 src/main.py /brush like
+   python3 src/main.py /brush choose ai
+   python3 src/main.py /brush choose design
+   python3 src/main.py /brush start
    ```
 2. 预期：
-   - 首次 `/brush` 出现“欢迎 + 冷启动进度”文案
-   - 冷启动阶段按钮为“这个领域感兴趣/下一个领域”
-   - 选择满 2 个领域后输出：`✅ 冷启动完成，已进入智能推荐。`
+   - 首次 `/brush` 出现“欢迎 + 冷启动进度（已选 0/2-3）”文案
+   - 可见分类按钮：`tech/ai/biz/design/science/popular`
+   - 选满 2 个领域后，`/brush start` 输出：`✅ 冷启动完成，已进入智能推荐。`
+   - 完成后下一条推荐会出现：`🧪 还在了解你的口味...（学习期 x/20）`
 
 ## 3.2 M8 自动化 smoke test（推荐）
 ```bash

@@ -5,23 +5,23 @@
 - **参与成员**: Opus (CloneLamb), Claude Code/Codex, 龍蝦 (小羊一号)
 
 ## 当前状态
-- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → ✅ M11 完成 → 🔄 M12 待开发
-- **进度**: v1.0 阶段进度 100%；全路线进度约 92%（11/12 里程碑）
-- **最后更新**: Codex / 2026-02-23 11:35
+- **阶段**: ✅ M1 完成 → ✅ M2 完成 → ✅ M3 完成 → ✅ M4 完成 → ✅ M5 完成 → ✅ M6 完成 → ✅ M7 完成 → ✅ M8 完成（v1.0）→ ✅ M9 完成 → ✅ M10 完成 → ✅ M11 完成 → ✅ M12 开发完成（待 VPS 验收）
+- **进度**: v1.0 阶段进度 100%；全路线开发进度 100%（12/12 里程碑）
+- **最后更新**: Codex / 2026-02-23 11:58
 
 ## Context（上下文）
 - 产品需求通过 TRQA 十轮问答法完成，详见 PRODUCT.md
 - 技术路线由 Opus 规划完成，详见 PLAN.md
 - 核心功能：冷启动 → 信息流 → 交互反馈 → 知识沉淀 → 智能推荐
 - 技术栈：Moltbot Skill + Telegram + Python + RSS + SQLite + Notion API
-- 推荐算法公式：Interest×0.4 + Knowledge×0.3 + Diversity×0.2 + Popularity×0.1
+- 推荐算法公式：Interest×0.4 + Knowledge×0.3 + Diversity×0.2 + Popularity×0.1（M12 快速学习期临时提升 Diversity 到 0.4）
 
 ## 下阶段目标
-- **任务**: 实现 M12（冷启动兴趣选择优化）
+- **任务**: 完成 M12 的 VPS 验收与看板同步
 - **由谁来做**: Codex / Claude Code
-- **预期产出**: 可运行的 Skill 代码
-- **预期时间**: 待按 `docs/USER_FEEDBACK_2026-02-23.md` 拆分排期
-- **起点**: 冷启动兴趣选 2-3 类并初始化权重
+- **预期产出**: claw 管家验收报告 + Notion 进度对齐
+- **预期时间**: 1 轮 VPS 回归
+- **起点**: 当前分支已具备 `choose/start` 兴趣选择与快速学习期逻辑
 
 ## 验收标准（M1 骨架搭建）
 - [x] 所有模块文件创建完成（见 PLAN.md 文件结构）
@@ -115,6 +115,20 @@
 - 2026-02-23 11:24 / Codex：完成展板同步：通过 Notion API 追加 M11 策略更新 callout（commit `0175718`，等待 claw 在线闭环结果）。
 - 2026-02-23 11:30 / Codex：接收 claw 管家 M11 验收报告（commit `d360f19`）：最小闭环与完整 5 按钮组均可点击并成功 callback；经验文档已沉淀至 `docs/M11_BUTTON_FIX_EXPERIENCE.md`。
 - 2026-02-23 11:34 / Codex：完成 M11 收口：`config.yaml` 标记 `m11_inline_buttons: true`，并更新 `README.md` 与 `docs/USER_FEEDBACK_2026-02-23.md` 的里程碑状态。
+- 2026-02-23 11:47 / Codex：完成 M12-1（冷启动兴趣选择），`src/main.py` 新增 `/brush choose <alias>` 与 `/brush start`，支持 6 类兴趣直接选择，冷启动改为“选 2-3 类”流程；`src/interaction/telegram.py` 同步新增分类按钮和“开始推荐”按钮。
+- 2026-02-23 11:51 / Codex：完成 M12-2（快速学习期），`src/main.py` 新增 learning state：冷启动完成后进入 20 次学习期，推荐权重自动切为 Diversity=0.4，并显示“还在了解你的口味...”提示；每 5 次交互执行轻量兴趣向量重平衡。
+- 2026-02-23 11:54 / Codex：完成 M12-3（回归与文档），更新 `scripts/m8_smoke_test.py` 适配新冷启动路径，`python3 scripts/m8_smoke_test.py` 本地 PASS；同时完成 `README.md`、`SKILL.md`、`docs/CLAW_MANAGER_TEST_MANUAL.md`、`docs/USER_FEEDBACK_2026-02-23.md`、`config.yaml` 对齐。
+
+## 测试验收（本地，M12 冷启动兴趣选择）
+- **执行命令**: `python3 -m py_compile src/main.py src/interaction/telegram.py scripts/m8_smoke_test.py`
+- **执行命令**: `python3 scripts/m8_smoke_test.py`
+- **执行命令**: `PYTHONPATH=src python3 - <<'PY' ... /brush -> choose ai -> choose design -> start -> /brush ... PY`
+- **结果**: ✅ PASS
+- **证据摘要**:
+  - 冷启动支持 `/brush choose ai|design` 与 `/brush start`
+  - 选满 2 类后可进入推荐，消息包含：`✅ 冷启动完成，已进入智能推荐。`
+  - 推荐消息包含学习期提示：`🧪 还在了解你的口味...（学习期 x/20）`
+  - 自动化脚本通过：`M8 smoke test PASS`
 
 ## 测试验收（VPS，M11 最终）
 - **测试环境**: claw 管家在线运行环境（/opus）
@@ -190,3 +204,4 @@
 - 非阻塞：`t.co` 为短链，已落地为可追溯来源 `https://gist.github.com/emschwartz/e6d2bf860ccc367fe37ff953ba6de66b`。
 - 已解除：Notion API 凭据已由羊爸爸提供，任务面板可访问。
 - 非阻塞：不同 Notion Database 的字段名可能与默认映射（`Title/Source/Summary/Tags/Saved At/Rating`）不一致；若出现 400 错误，需在下一步补充字段映射配置。
+- 待验证：M12 已本地通过，仍需 claw 管家在 VPS 复测 `/brush choose` 与 `/brush start` 按钮回调链路。

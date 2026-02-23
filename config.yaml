@@ -50,4 +50,4 @@ milestones:
   m9_performance: true
   m10_deep_read: true
   m11_inline_buttons: true
-  m12_interest_selection: false
+  m12_interest_selection: true

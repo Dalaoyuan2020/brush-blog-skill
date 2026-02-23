@@ -17,8 +17,10 @@ metadata: {"clawdbot":{"emoji":"🦞"},"openclaw":{"emoji":"📰","homepage":"ht
 - `/brush read` - 展开当前文章深度阅读
 - `/brush save` - 收藏并沉淀到知识库（本地 JSONL，可选 Notion）
 - `/brush refresh` - 换一批推荐
+- `/brush choose <tech|ai|biz|design|science|popular>` - 冷启动阶段直接选择兴趣分类
+- `/brush start` - 冷启动选满 2 类后进入智能推荐
 
-新用户首次执行 `/brush` 会自动进入冷启动：先看不同领域种子内容，点 `👍` 选满 2 个感兴趣领域后自动切换到常规推荐流。
+新用户首次执行 `/brush` 会自动进入冷启动：可点击分类按钮选择 2-3 个兴趣领域，也可继续对当前领域点 `👍`。选满 2 类后可点 `✅ 开始推荐`，系统将进入 20 次快速学习期。
 
 ## 执行流程（当前已实现）
 

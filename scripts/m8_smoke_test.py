@@ -53,9 +53,9 @@ def _run():
     outputs = []
     for command in [
         "/brush",
-        "/brush like",
-        "/brush skip",
-        "/brush like",
+        "/brush choose ai",
+        "/brush choose design",
+        "/brush start",
         "/brush",
         "/brush read",
         "/brush save",
@@ -69,8 +69,14 @@ def _run():
     _assert("欢迎来到刷博客" in first, "cold start welcome message missing")
     _assert("冷启动进度" in first, "cold start progress missing")
 
+    choose_output = outputs[1]["message"]
+    _assert("已选择领域" in choose_output, "interest selection message missing")
+
     completion = outputs[3]["message"]
     _assert("冷启动完成" in completion, "cold start completion message missing")
+
+    second_feed_output = outputs[4]["message"]
+    _assert("还在了解你的口味" in second_feed_output or "稳定推荐模式" in second_feed_output, "quick learning hint missing")
 
     read_output = outputs[5]["message"]
     _assert("深度阅读" in read_output, "read command failed")
@@ -84,7 +90,7 @@ def _run():
 
     behavior_rows = [row for row in _read_jsonl(BEHAVIOR_EVENTS_FILE) if row.get("user_id") == TEST_USER_ID]
     actions = [row.get("action") for row in behavior_rows]
-    for expected_action in ["cold_start_view", "cold_start_like", "cold_start_complete", "view", "read", "save", "refresh"]:
+    for expected_action in ["cold_start_view", "cold_start_choose", "cold_start_complete", "view", "read", "save", "refresh"]:
         _assert(expected_action in actions, "behavior action missing: {0}".format(expected_action))
 
     note_rows = [row for row in _read_jsonl(SAVED_NOTES_FILE) if row.get("user_id") == TEST_USER_ID]
