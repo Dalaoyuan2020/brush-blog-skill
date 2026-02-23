@@ -8,9 +8,10 @@ V2.0 内容池管理器
 
 import argparse
 import json
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlsplit, urlunsplit
 
 from fetcher.rss import fetch_latest_article, load_feeds
@@ -18,10 +19,12 @@ from fetcher.rss import fetch_latest_article, load_feeds
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FEEDS_FILE = ROOT_DIR / "data" / "feeds.json"
 SHARED_POOL_FILE = ROOT_DIR / "shared" / "content_pool.json"
+SHARED_POOL_LOG_FILE = ROOT_DIR / "shared" / "pool_log.jsonl"
 
 POOL_MIN = 10
 POOL_MAX = 20
 FETCH_TIMEOUT_SECONDS = 8
+CLEANUP_DAYS_DEFAULT = 7
 
 
 def _now_iso_utc() -> str:
@@ -42,6 +45,37 @@ def _write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
+
+
+def _append_pool_log(action: str, **fields: Any) -> None:
+    record = {"action": action, "timestamp": _now_iso_utc()}
+    record.update(fields)
+    SHARED_POOL_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with SHARED_POOL_LOG_FILE.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
+def _parse_iso_datetime(value: Any) -> Optional[datetime]:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _article_datetime(article: Dict[str, Any]) -> Optional[datetime]:
+    for key in ("published_at", "fetched_at", "created_at"):
+        parsed = _parse_iso_datetime(article.get(key))
+        if parsed is not None:
+            return parsed
+    return None
 
 
 def _normalize_url(url: str) -> str:
@@ -179,6 +213,51 @@ def refresh_pool(
     return payload
 
 
+def cleanup_pool(
+    output_file: Path = SHARED_POOL_FILE,
+    days: int = CLEANUP_DAYS_DEFAULT,
+) -> Dict[str, Any]:
+    """
+    清理超过 days 天的过期文章并写回内容池。
+    """
+    data = _read_json(output_file, {})
+    if not isinstance(data, dict):
+        data = {"articles": []}
+
+    articles = data.get("articles", [])
+    if not isinstance(articles, list):
+        articles = []
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=max(0, int(days)))
+    kept: List[Dict[str, Any]] = []
+    removed = 0
+
+    for item in articles:
+        if not isinstance(item, dict):
+            removed += 1
+            continue
+        article_dt = _article_datetime(item)
+        if article_dt is None:
+            removed += 1
+            continue
+        if article_dt < cutoff:
+            removed += 1
+            continue
+        kept.append(item)
+
+    data["articles"] = kept
+    data["pool_size"] = len(kept)
+    data["last_cleanup"] = _now_iso_utc()
+    data.setdefault("min_threshold", 5)
+    _write_json(output_file, data)
+
+    return {
+        "articles_removed": removed,
+        "pool_size": len(kept),
+        "days": max(0, int(days)),
+    }
+
+
 def _print_refresh_summary(payload: Dict[str, Any]) -> None:
     articles = payload.get("articles", [])
     if not isinstance(articles, list):
@@ -192,14 +271,49 @@ def _print_refresh_summary(payload: Dict[str, Any]) -> None:
         print("样例文章: {0}".format(str(articles[0].get("title", "Untitled"))))
 
 
+def _print_cleanup_summary(result: Dict[str, Any]) -> None:
+    print("清理完成")
+    print(
+        "删除了 {0} 篇过期文章，剩余 {1} 篇".format(
+            int(result.get("articles_removed", 0) or 0),
+            int(result.get("pool_size", 0) or 0),
+        )
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="V2 content pool manager")
-    parser.add_argument("action", nargs="?", default="refresh", choices=["refresh"], help="pool action")
+    parser.add_argument("action", nargs="?", default="refresh", choices=["refresh", "cleanup"], help="pool action")
+    parser.add_argument("--days", type=int, default=CLEANUP_DAYS_DEFAULT, help="cleanup threshold days, default 7")
     args = parser.parse_args()
 
     if args.action == "refresh":
+        started_at = time.perf_counter()
         payload = refresh_pool()
+        duration_sec = round(time.perf_counter() - started_at, 3)
         _print_refresh_summary(payload)
+        articles = payload.get("articles", [])
+        if not isinstance(articles, list):
+            articles = []
+        _append_pool_log(
+            action="refresh",
+            articles_added=len(articles),
+            pool_size=int(payload.get("pool_size", 0) or 0),
+            duration_sec=duration_sec,
+        )
+        return 0
+
+    if args.action == "cleanup":
+        started_at = time.perf_counter()
+        result = cleanup_pool(days=args.days)
+        duration_sec = round(time.perf_counter() - started_at, 3)
+        _print_cleanup_summary(result)
+        _append_pool_log(
+            action="cleanup",
+            articles_removed=int(result.get("articles_removed", 0) or 0),
+            pool_size=int(result.get("pool_size", 0) or 0),
+            duration_sec=duration_sec,
+        )
         return 0
     return 1
 
